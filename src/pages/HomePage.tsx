@@ -20,6 +20,7 @@ import { StatusPill, type Tone } from '@/components/ui/StatusPill';
 import { TRANSPORT_MODES, type TransportMode } from '@/domain/models/types';
 import { useCurrentLocation, type LocationPreviewStatus } from '@/hooks/useCurrentLocation';
 import { useRecorderBusy } from '@/hooks/useRecorderBusy';
+import { useRecoverableTrip } from '@/hooks/useRecoverableTrip';
 import { useServices } from '@/hooks/useServices';
 import { useTracking } from '@/hooks/useTracking';
 import { useTripList } from '@/hooks/useTrips';
@@ -79,6 +80,9 @@ export function HomePage() {
   const tracking = useTracking();
   const trips = useTripList();
   const recorderBusy = useRecorderBusy();
+  const recovery = useRecoverableTrip();
+  // BR-01: one trip at a time — an unfinished trip must be resumed or ended first.
+  const blockedByRecovery = recovery.trip !== null;
   const { transportMode, tripName, setTransportMode, setTripName } = useUiStore();
   const modeId = useId();
   const nameId = useId();
@@ -106,7 +110,7 @@ export function HomePage() {
 
   const onStart = (e: SubmitEvent<HTMLFormElement>): void => {
     e.preventDefault();
-    if (!preview.hasValidFix || active || recorderBusy) return;
+    if (!preview.hasValidFix || active || recorderBusy || blockedByRecovery) return;
     const name = tripName.trim() === '' ? defaultTripName(clock.now()) : tripName.trim();
     void tracker.start({ name, transportMode });
     setTripName('');
@@ -120,7 +124,7 @@ export function HomePage() {
         <StatusPill tone={pill.tone} label={pill.label} testId="gps-status" />
       </div>
 
-      <RecoveryNotice />
+      <RecoveryNotice recovery={recovery} />
       <PlatformLimitNotice />
       <LocationMessage status={preview.status} />
 
@@ -218,11 +222,16 @@ export function HomePage() {
               {COPY.recorderBusy}
             </Notice>
           )}
+          {blockedByRecovery && !recorderBusy && (
+            <Notice tone="warn" testId="start-blocked-recovery">
+              {COPY.startBlockedRecovery}
+            </Notice>
+          )}
           <Button
             type="submit"
             size="lg"
             className="w-full"
-            disabled={!preview.hasValidFix || recorderBusy}
+            disabled={!preview.hasValidFix || recorderBusy || blockedByRecovery}
           >
             Bắt đầu ghi hành trình
           </Button>

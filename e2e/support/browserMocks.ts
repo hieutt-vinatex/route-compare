@@ -27,6 +27,8 @@ interface RtMock {
   setVisibility(state: DocumentVisibilityState): void;
   activeWatchers(): number;
   watchCalls(): number;
+  /** Content-Security-Policy violations seen by the page (`directive blockedURI`). */
+  cspViolations(): string[];
 }
 
 declare global {
@@ -47,6 +49,10 @@ export async function installBrowserMocks(page: Page, options: BrowserMockOption
     let watchCalls = 0;
     const watchers = new Map<number, Waiter>();
     const waiting: Waiter[] = [];
+    const cspViolations: string[] = [];
+    document.addEventListener('securitypolicyviolation', (e) => {
+      cspViolations.push(`${e.effectiveDirective} ${e.blockedURI}`);
+    });
 
     const makeError = (code: number): GeolocationPositionError => ({
       code,
@@ -173,6 +179,7 @@ export async function installBrowserMocks(page: Page, options: BrowserMockOption
       },
       activeWatchers: () => watchers.size,
       watchCalls: () => watchCalls,
+      cspViolations: () => [...cspViolations],
     };
   }, options);
 }
@@ -200,6 +207,11 @@ export async function emit(page: Page, position: MockPosition): Promise<void> {
   await page.evaluate((p) => {
     window.__rtMock.emit(p);
   }, position);
+}
+
+/** CSP violations so far — the production policy is served by `vite preview` (deploy/). */
+export async function cspViolations(page: Page): Promise<string[]> {
+  return page.evaluate(() => window.__rtMock.cspViolations());
 }
 
 export async function setVisibility(page: Page, state: DocumentVisibilityState): Promise<void> {

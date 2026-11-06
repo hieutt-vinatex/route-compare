@@ -3,7 +3,8 @@
  * attribution and forbid bulk/offline prefetch (OSM Tile Usage Policy). We never prefetch tiles.
  * Tile requests reveal the viewed map area to the tile provider (privacy note in UI).
  */
-const DEFAULT_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+import { DEFAULT_TILE_URL } from './tileDefaults';
+
 const DEFAULT_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors';
 /** Leaflet credit; opens in a new tab so a mis-tap never navigates away from a recording. */

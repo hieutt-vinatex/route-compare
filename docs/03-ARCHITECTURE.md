@@ -128,7 +128,7 @@ Một lỗi async write không được silently swallowed. Nếu persist raw th
 
 ## 8. Security & privacy
 
-- HTTPS production, CSP phù hợp nguồn bản đồ, tránh nhúng script lạ.
+- HTTPS production, CSP phù hợp nguồn bản đồ, tránh nhúng script lạ. Triển khai: `deploy/securityHeaders.ts` sinh `dist/_headers` khi build và cấp header cho `vite preview` (E2E). `connect-src 'self'` (mã trang không gửi được dữ liệu ra origin khác), `img-src` chỉ origin tile suy ra từ `VITE_TILE_URL` (bắt buộc https), không `unsafe-inline`/`unsafe-eval`, `frame-ancestors 'none'`, `Permissions-Policy` giới hạn geolocation/wake lock cho origin app, `Referrer-Policy: strict-origin-when-cross-origin` (OSM yêu cầu Referer).
 - Quyền GPS theo thao tác của người dùng; có màn hình giải thích việc thu thập vị trí.
 - Không upload GPS, không Google Analytics riêng tư mặc định, không lưu API key bí mật trong Vite env (public bundle).
 - Cẩn trọng với các tile/traffic provider: việc tải tile có thể tiết lộ vùng bản đồ người dùng xem; nêu trong privacy note.

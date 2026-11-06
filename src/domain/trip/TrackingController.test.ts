@@ -190,6 +190,16 @@ describe('recovery after a reload (FR-12, UC-08, BROWSER_RELOAD)', () => {
     return { before, reloaded };
   }
 
+  it('refuses a new trip while an unfinished one is waiting to be resolved (BR-01)', async () => {
+    const { before, reloaded } = await recordThenReload();
+    await reloaded.controller.start({ name: 'second', transportMode: 'WALK' });
+    expect(reloaded.controller.getSnapshot().status).toBe('IDLE');
+    expect(reloaded.geo.isWatching()).toBe(false);
+    expect(reloaded.lock.held).toBe(false);
+    const active = await h.repo.listActiveTrips();
+    expect(active.map((t) => t.id)).toEqual([before.tripId]);
+  });
+
   it('finds the unfinished trip, unless another tab is recording it', async () => {
     const { before, reloaded } = await recordThenReload();
     expect((await reloaded.controller.findRecoverable())?.id).toBe(before.tripId);

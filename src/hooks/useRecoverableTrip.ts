@@ -4,7 +4,14 @@ import { useServices } from './useServices';
 import { useTracking } from './useTracking';
 
 /** An unfinished trip left by a reload/closed tab (FR-12), while this tab is idle. */
-export function useRecoverableTrip(): { trip: Trip | null; refresh: () => void } {
+export interface RecoverableTrip {
+  /** Unfinished trip left by a reload/crash, or null. */
+  readonly trip: Trip | null;
+  /** Look again (after the user resolved it). */
+  readonly refresh: () => void;
+}
+
+export function useRecoverableTrip(): RecoverableTrip {
   const { tracker, lock } = useServices();
   const { status } = useTracking();
   const [found, setFound] = useState<Trip | null>(null);

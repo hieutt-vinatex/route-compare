@@ -19,6 +19,8 @@
 | ADR-11 | Cloudflare Pages | Hosting tĩnh HTTPS, deploy từ Git |
 | ADR-12 | Backend/Traffic API ngoài MVP | Bảo vệ phạm vi và chi phí, chỉ thêm khi có bằng chứng nhu cầu |
 
+**Đối chiếu ADR-11 (06/11/2026):** giữ Cloudflare Pages — gói Free không giới hạn băng thông tĩnh, cho phép dùng thương mại, preview theo nhánh, `_headers`. Cloudflare khuyến nghị *Workers Static Assets* cho dự án mới nhưng Pages vẫn được hỗ trợ đầy đủ; chỉ chuyển khi có lý do cụ thể (app thuần tĩnh, không dùng tính năng riêng của Workers). Vercel Hobby cấm dùng thương mại; Netlify Free tính theo credit. Header bảo mật/CSP sinh lúc build từ `deploy/securityHeaders.ts`.
+
 **Quy tắc phiên bản:** Cài bản stable tương thích tại thời điểm triển khai, commit `package-lock.json`, dùng `npm ci` trong CI. Không tự đoán số phiên bản hay nâng major đồng loạt không kiểm thử. Cấm thêm framework backend hoặc SDK native khi chưa có yêu cầu được phê duyệt.
 
 ## 0.2. Giới hạn không thể “code workaround”

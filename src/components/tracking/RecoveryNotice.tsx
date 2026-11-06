@@ -4,15 +4,16 @@ import { COPY } from '@/app/copy';
 import { formatDateTime } from '@/app/format';
 import { Button } from '@/components/ui/Button';
 import { Notice } from '@/components/ui/Notice';
-import { useRecoverableTrip } from '@/hooks/useRecoverableTrip';
+import type { RecoverableTrip } from '@/hooks/useRecoverableTrip';
 import { useServices } from '@/hooks/useServices';
 
 /**
  * UC-08: an unfinished trip was found after a reload. The closed period is never filled in;
- * the user chooses to continue (new segment) or end it as incomplete.
+ * the user chooses to continue (new segment) or end it as incomplete. The page owns the lookup
+ * (useRecoverableTrip) so it can also block Start while a trip waits (BR-01).
  */
-export function RecoveryNotice() {
-  const { trip, refresh } = useRecoverableTrip();
+export function RecoveryNotice({ recovery }: { readonly recovery: RecoverableTrip }) {
+  const { trip, refresh } = recovery;
   const { tracker } = useServices();
   const navigate = useNavigate();
   const [working, setWorking] = useState(false);

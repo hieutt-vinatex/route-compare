@@ -83,7 +83,7 @@ Kiểm thử **mô phỏng** (Vitest + Playwright với GPS giả lập). Chưa 
 | GPS-004 | ✅ | `trackProcessor.filters.test.ts`, `TrackingController.test.ts`, E2E AC-03 |
 | GPS-005 | ✅ | `trackProcessor.test.ts`, `TrackingController.test.ts`, E2E tracking |
 | GPS-006 | ✅ | `trackProcessor.filters.test.ts` |
-| GPS-007 | ✅ | `trackProcessor.test.ts` (live), `analyzeTrip.test.ts` “SPEED_NULL classification” (đi bộ/xe đạp/ô tô, accuracy 5–15 m, điểm thưa 8 s) |
+| GPS-007 | ✅ | `trackProcessor.test.ts` (live), `trackProcessor.filters.test.ts` “live speed” (BR-07: đi chậm trong sai số → `—`, 0 chỉ khi dừng ≥ 15 s), `analyzeTrip.test.ts` “SPEED_NULL classification” (đi bộ/xe đạp/ô tô, accuracy 5–15 m, điểm thưa 8 s) |
 | GPS-008 | ✅ | `trackProcessor.test.ts`, `trackProcessor.clock.test.ts` (CLOCK_ERROR) |
 | GPS-009 | ✅ | `analyzeTrip.test.ts` |
 | GPS-010 | ✅ | `analyzeTrip.test.ts` (± 1 ms) |
@@ -91,6 +91,7 @@ Kiểm thử **mô phỏng** (Vitest + Playwright với GPS giả lập). Chưa 
 | GPS-012 | ⏳ M4 | nhóm A→B |
 | AC-01, AC-02, AC-04, AC-10 | ✅ | `e2e/tracking.spec.ts` |
 | AC-03, AC-05, AC-07, AC-09 | ✅ | `e2e/persistence.spec.ts` |
+| NFR-02, NFR-06 (header/CSP, không gửi dữ liệu ra ngoài) | ✅ | `deploy/securityHeaders.test.ts`, `e2e/security.spec.ts`, kiểm tra vi phạm CSP cuối `e2e/tracking.spec.ts` |
 | AC-06, AC-08, AC-11 | ⏳ M3/M4 | |
 
 Hiệu năng (§5): `analyzeTrip` trên 10 000 điểm đo được ~100 ms (lần đầu) / ~40 ms (đã warm) trên máy phát triển; trên điện thoại thật cần đo lại.

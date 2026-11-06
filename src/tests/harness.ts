@@ -154,9 +154,12 @@ export interface ControllerHarness {
   emitAll(specs: readonly SampleSpec[]): Promise<void>;
 }
 
+let reloadCount = 0;
+
 /**
  * `shared` lets a second harness reuse the storage and clock of a first one — exactly what a
- * page reload sees (same IndexedDB, fresh JavaScript state).
+ * page reload sees (same IndexedDB, fresh JavaScript state). A reloaded page draws new random
+ * UUIDs, so its ids never collide with the stored ones.
  */
 export function createControllerHarness(
   config: GpsConfig = DEFAULT_GPS_CONFIG,
@@ -175,7 +178,7 @@ export function createControllerHarness(
     wakeLock,
     repository: repo,
     clock,
-    ids: sequentialIds(),
+    ids: sequentialIds(shared.repo === undefined ? 'id' : `reload${++reloadCount}`),
     config,
     timers,
     lock,

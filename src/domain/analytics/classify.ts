@@ -19,9 +19,8 @@
  * segment start or end, never survives (a spike only touches isolated values on that long base).
  * Durations use the app clock (recordedAt), the same clock as elapsed and pauses.
  */
-import { haversineM } from '../geo/haversine';
+import { isCompactAndSlow, resolvedSpeedMps } from '../geo/motionEvidence';
 import type { GpsConfig } from '../models/gpsConfig';
-import type { LatLng } from '../models/types';
 import type { ReplayedFix } from './replay';
 import { median } from './speed';
 
@@ -63,7 +62,7 @@ function classifySegment(seg: readonly ReplayedFix[], config: GpsConfig): Classi
   );
   const stopped = confirmedStopFixes(seg, config);
   const statBase: (number | null)[] = seg.map((fix, i) =>
-    i === 0 ? null : (fix.speedMps ?? resolvedSpeed(seg, i, config)),
+    i === 0 ? null : (fix.speedMps ?? resolvedSpeedMps(seg, i, config)),
   );
   const half = Math.floor(Math.max(1, config.speedStatsWindow) / 2);
 
@@ -88,28 +87,6 @@ function classifySegment(seg: readonly ReplayedFix[], config: GpsConfig): Classi
     edges.push({ from: a.recordedAt, to: b.recordedAt, cls, speedMps: local, statSpeedMps });
   }
   return edges;
-}
-
-/**
- * Displacement speed ending at seg[i] from the latest earlier fix that is ≥ liveSpeedWindowMs older
- * and farther than the combined position uncertainty; null when no such fix exists.
- */
-function resolvedSpeed(seg: readonly ReplayedFix[], i: number, config: GpsConfig): number | null {
-  const end = seg[i];
-  if (end === undefined) return null;
-  // Bounded look-back keeps this linear on long stationary stretches.
-  const maxLookbackMs = 4 * config.stop.dwellMs;
-  for (let j = i - 1; j >= 0; j -= 1) {
-    const from = seg[j];
-    if (from === undefined) continue;
-    const dtMs = end.sourceTimestamp - from.sourceTimestamp;
-    if (dtMs > maxLookbackMs) break;
-    if (dtMs < config.liveSpeedWindowMs) continue;
-    const movedM = haversineM(from, end);
-    if (movedM >= Math.hypot(from.accuracyM ?? 0, end.accuracyM ?? 0))
-      return movedM / (dtMs / 1000);
-  }
-  return null;
 }
 
 /** Speed of each drift-filter chunk, assigned to every edge inside it (null after the last anchor). */
@@ -147,33 +124,6 @@ function confirmedStopFixes(seg: readonly ReplayedFix[], config: GpsConfig): Set
     if (isCompactAndSlow(window, config)) for (let j = i; j <= k; j += 1) out.add(j);
   }
   return out;
-}
-
-function isCompactAndSlow(window: readonly ReplayedFix[], config: GpsConfig): boolean {
-  const center = centroid(window);
-  const accuracy = median(definedOf(window.map((f) => f.accuracyM))) ?? 0;
-  const radius = Math.max(config.stop.radiusM, accuracy);
-  if (window.some((f) => haversineM(center, f) > radius)) return false;
-  const group = Math.max(1, Math.floor(window.length / 3));
-  const head = window.slice(0, group);
-  const tail = window.slice(-group);
-  const dtS = (meanTime(tail) - meanTime(head)) / 1000;
-  if (dtS <= 0) return false;
-  return haversineM(centroid(head), centroid(tail)) / dtS < config.stop.speedKmh / 3.6;
-}
-
-function centroid(fixes: readonly ReplayedFix[]): LatLng {
-  let lat = 0;
-  let lng = 0;
-  for (const f of fixes) {
-    lat += f.lat;
-    lng += f.lng;
-  }
-  return { lat: lat / fixes.length, lng: lng / fixes.length };
-}
-
-function meanTime(fixes: readonly ReplayedFix[]): number {
-  return fixes.reduce((sum, f) => sum + f.sourceTimestamp, 0) / fixes.length;
 }
 
 function definedOf(values: readonly (number | null | undefined)[]): number[] {

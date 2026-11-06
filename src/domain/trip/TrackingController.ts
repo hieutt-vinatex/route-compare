@@ -271,6 +271,14 @@ export class TrackingController {
     if (this.wasCancelled()) return; // cancelStart releases the lock
 
     try {
+      // BR-01: a trip left unfinished by a reload/crash must be resumed or ended first.
+      if ((await repository.listActiveTrips()).length > 0) {
+        this.trip = null;
+        await this.deps.lock.release();
+        if (this.currentStatus() === 'STARTING') this.transition('START_FAILED');
+        this.publish();
+        return;
+      }
       await repository.create(trip);
     } catch {
       this.storageError = true;

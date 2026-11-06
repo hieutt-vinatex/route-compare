@@ -42,6 +42,8 @@ export const COPY = {
     'Thời gian của nhiều mẫu GPS không khớp với đồng hồ thiết bị nên đang bị bỏ qua. Nếu tình trạng kéo dài, khi đã dừng an toàn hãy kiểm tra cài đặt ngày giờ tự động.',
   recorderBusy:
     'Đang có hành trình được ghi ở một tab khác của trình duyệt này. Mỗi thiết bị chỉ ghi một hành trình một lúc — hãy chuyển sang tab đó.',
+  startBlockedRecovery:
+    'Hãy tiếp tục hoặc kết thúc hành trình chưa kết thúc ở trên trước khi bắt đầu hành trình mới.',
   recoveryExplain:
     'Trang đã bị tải lại hoặc đóng khi hành trình đang ghi. Khoảng thời gian đó không được đo và không được cộng quãng đường.',
   paused:

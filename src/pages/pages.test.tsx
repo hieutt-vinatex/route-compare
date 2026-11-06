@@ -330,6 +330,23 @@ describe('Recovery after reload (FR-12, UC-08)', () => {
     expect(await services.repository.listTrips()).toEqual([]);
   });
 
+  it('keeps Start disabled until the unfinished trip is resolved (BR-01)', async () => {
+    await leftover({});
+    services.geo.currentPosition = toSample({ t: 0, lat: ORIGIN.lat, lng: ORIGIN.lng });
+    renderApp('/', services);
+    await screen.findByText('GPS: Sẵn sàng');
+    const notice = await screen.findByTestId('recovery-notice');
+    const start = screen.getByRole('button', { name: 'Bắt đầu ghi hành trình' });
+    expect(start).toBeDisabled();
+    expect(screen.getByTestId('start-blocked-recovery')).toBeInTheDocument();
+
+    await userEvent.click(within(notice).getByRole('button', { name: 'Hủy hành trình' }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('recovery-notice')).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Bắt đầu ghi hành trình' })).toBeEnabled();
+  });
+
   it('is not offered while another tab is recording', async () => {
     await leftover({ startLat: ORIGIN.lat, startLng: ORIGIN.lng });
     services.mockLock.heldByOtherTab = true;

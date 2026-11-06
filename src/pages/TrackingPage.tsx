@@ -18,6 +18,7 @@ import { MetricCard } from '@/components/ui/MetricCard';
 import { Notice } from '@/components/ui/Notice';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useRecoverableTrip } from '@/hooks/useRecoverableTrip';
 import { useServices } from '@/hooks/useServices';
 import { useTracking } from '@/hooks/useTracking';
 import { useUiStore } from '@/stores/uiStore';
@@ -26,6 +27,7 @@ export function TrackingPage() {
   const s = useTracking();
   const { tracker, config } = useServices();
   const online = useOnlineStatus();
+  const recovery = useRecoverableTrip();
   const navigate = useNavigate();
   const [follow, setFollow] = useState(true);
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -66,7 +68,7 @@ export function TrackingPage() {
             {COPY.recorderBusy}
           </Notice>
         )}
-        <RecoveryNotice />
+        <RecoveryNotice recovery={recovery} />
         <EmptyState
           title="Chưa có hành trình đang ghi"
           description="Bắt đầu một hành trình từ trang chủ."

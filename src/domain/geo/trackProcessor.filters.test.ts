@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   calibratedProcessor,
+  lastOf,
   ORIGIN,
   stationaryJitter,
   straightLine,
@@ -48,7 +49,7 @@ describe('GPS-002 stationary jitter (drift filter)', () => {
     const still = stationaryJitter({ count: 60, radiusM: 4, accuracyM: 8 });
     const { state } = run(still);
     const now = T0 + 59_000 + 500;
-    expect(liveSpeedMps(state, now, cfg) ?? 0).toBeLessThan(2 / 3.6);
+    expect(liveSpeedMps(state, now, cfg)).toBe(0);
   });
 });
 
@@ -122,6 +123,41 @@ describe('live speed', () => {
     const line = straightLine({ count: 8, speedMps: 5 });
     const { state } = run(line);
     expect(liveSpeedMps(state, T0 + 7_500, cfg)).toBeCloseTo(5, 1);
+  });
+
+  // BR-07: 0 km/h only for a confirmed stop; movement still inside the uncertainty is "—".
+  it('reads null ("—"), not 0, while slow walking is still inside the position uncertainty', () => {
+    // 1.2 m/s at 15 m accuracy: 7 s cover 8.4 m, less than the 21 m combined uncertainty.
+    const walk = straightLine({ count: 8, speedMps: 1.2, accuracyM: 15 });
+    const { state } = run(walk, 'WALK');
+    expect(liveSpeedMps(state, T0 + 7_500, cfg)).toBeNull();
+  });
+
+  it('measures slow walking over a longer base once it leaves the uncertainty', () => {
+    const walk = straightLine({ count: 25, speedMps: 1.2, accuracyM: 15 });
+    const { state } = run(walk, 'WALK');
+    expect(liveSpeedMps(state, T0 + 24_500, cfg)).toBeCloseTo(1.2, 1);
+  });
+
+  it('reads 0 only once a stop is confirmed over the dwell time', () => {
+    const shortStop = run(stationaryJitter({ count: 10, radiusM: 4, accuracyM: 8 })).state;
+    expect(liveSpeedMps(shortStop, T0 + 9_500, cfg)).toBeNull();
+    const longStop = run(stationaryJitter({ count: 20, radiusM: 4, accuracyM: 8 })).state;
+    expect(liveSpeedMps(longStop, T0 + 19_500, cfg)).toBe(0);
+  });
+
+  it('a walk that just stopped is not 0 before the dwell confirms the stop', () => {
+    const walk = straightLine({ count: 20, speedMps: 1.5, accuracyM: 8 });
+    const end = lastOf(walk);
+    const still = stationaryJitter({
+      count: 6,
+      startT: end.t + 1_000,
+      radiusM: 2,
+      accuracyM: 8,
+      center: { lat: end.lat, lng: end.lng },
+    });
+    const { state } = run([...walk, ...still], 'WALK');
+    expect(liveSpeedMps(state, T0 + lastOf(still).t + 500, cfg)).not.toBe(0);
   });
 });
 

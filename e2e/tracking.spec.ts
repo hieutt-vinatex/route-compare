@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  cspViolations,
   eastLine,
   emit,
   installBrowserMocks,
@@ -99,6 +100,8 @@ test.describe('live tracking with simulated GPS (AC-02, AC-03, AC-04, AC-10)', (
     for (const host of hosts) {
       expect([new URL(page.url()).host, TILE_HOST]).toContain(host);
     }
+    // The whole flow ran under the production CSP without a single blocked resource.
+    expect(await cspViolations(page)).toEqual([]);
   });
 
   test('permission revoked mid-trip → interrupted, can end as incomplete', async ({ page }) => {

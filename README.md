@@ -46,7 +46,7 @@ Mở `http://localhost:5173/?gps=demo`: dùng tuyến đi bộ **tổng hợp** 
 Vì GPS cần HTTPS, chọn một trong các cách:
 
 1. **Android + Chrome (khuyên dùng khi dev):** cắm USB, bật USB debugging, mở `chrome://inspect/#devices` trên máy tính → *Port forwarding* `5173 → localhost:5173`. Trên điện thoại mở `http://localhost:5173` (được coi là secure context).
-2. **Bản deploy HTTPS** (Cloudflare Pages preview — xem [Deploy](#deploy)).
+2. **Bản deploy HTTPS** (Cloudflare Pages preview — xem [Deploy](#deploy-cloudflare-pages--miễn-phí)).
 3. `npm run dev -- --host` rồi truy cập qua IP LAN **không** dùng được GPS (không phải HTTPS) — app sẽ hiển thị “Tính năng GPS yêu cầu website chạy qua HTTPS.”
 
 ## Kiến trúc
@@ -86,13 +86,14 @@ Luồng một mẫu GPS: `watchPosition` → chuẩn hóa đơn vị → **hàng
 | **M2** | ✅ | Dexie/IndexedDB (schema v1, giao dịch, test migration), mô hình độ lệch đồng hồ, lọc OUTLIER + drift, phân loại MOVING/STOPPED/UNKNOWN, phân hoạch thời gian, coverage + nhãn chất lượng, Tạm dừng/Tiếp tục, checkpoint + timeout khi lưu, khôi phục sau reload, khóa một tab. GPS-001…011 |
 | M3 | ⏳ | Lịch sử (tìm/lọc), chi tiết đầy đủ, biểu đồ tốc độ, nhãn chất lượng |
 | M4 | ⏳ | So sánh 2–4 chuyến, nhóm A→B, route variant, xuất GPX/CSV/JSON |
-| M5 | ⏳ | PWA app-shell cache, Cloudflare Pages, QA & field test |
+| M5 | ⏳ | PWA app-shell cache, QA & field test. **Đã sẵn sàng deploy** Cloudflare Pages (header bảo mật/CSP, SPA fallback) — xem [Deploy](#deploy-cloudflare-pages--miễn-phí) |
 
 ### Giới hạn đã biết sau M2
 
 - Mọi ngưỡng (độ chính xác 30 m, gap 20 s, dung sai đồng hồ 5 s, drift, outlier, dừng 2 km/h/15 s/20 m) là **heuristic chưa hiệu chỉnh thực địa**.
 - Mẫu GPS đầu tiên của mỗi chuyến chỉ để hiệu chỉnh đồng hồ (mất ~1 s đầu).
 - Trong ~3 s đầu mỗi đoạn, “tốc độ hiện tại” có thể bị một điểm nhiễu kéo lên.
+- Khi thiết bị không báo `coords.speed`, “tốc độ hiện tại” hiện **—** cho tới khi độ dời vượt sai số GPS (đi bộ với sai số 15 m: ~18 s đầu) và chỉ hiện **0 km/h** sau khi đứng yên ≥ 15 s (BR-07).
 - Di chuyển rất chậm (< 2 km/h) trong bán kính 20 m quá 15 s có thể bị tính là “dừng”.
 - Khi thiết bị không báo `coords.speed`, một lần dừng ngắn hơn 15 s có thể được tính như di chuyển chậm (không bao giờ là “dừng”).
 - Bộ lọc nhiễu tính quãng đường theo “bước neo”: đường cong gắt với độ chính xác 15–30 m bị **đánh giá thấp** (ví dụ mô phỏng đường bậc thang: đo 299 m / thực 419 m).
@@ -105,7 +106,7 @@ Luồng một mẫu GPS: `watchPosition` → chuẩn hóa đơn vị → **hàng
 - **Unit/replay** (`src/**/*.test.ts`): GPS-001…011 (bảng truy vết ở `docs/07-TEST-PLAN.md` §7), **CLOCK_ERROR** (đồng hồ lệch cố định, fix “ở tương lai”, giao trễ, đồng hồ bị chỉnh, độ trễ trôi dần), bất biến “không cộng quãng đường qua ranh giới đoạn” với replay ngẫu nhiên có seed, “phát lại = live”. GPS-012 (nhóm A→B) thuộc M4.
 - **Repository** (fake-indexeddb): CRUD, unique `[tripId+sourceSeq]`, xóa cascade nguyên tử, mở lại DB, mẫu nâng cấp schema giữ dữ liệu.
 - **Controller**: ghi RAW trước, ghi storage lệch thứ tự (đã kiểm bằng mutation test), lỗi quota, thu hồi quyền, tạm dừng/tiếp tục, checkpoint, timeout khi lưu, khôi phục sau reload, khóa một tab, Wake Lock.
-- **E2E (Playwright)**: chạy code adapter thật với **GPS giả lập** và đồng hồ trang được điều khiển — quyền, ẩn/hiện → 2 đoạn không nối, giữ dữ liệu qua reload (AC-05), khôi phục + đoạn mới, tạm dừng (AC-03), hai tab (AC-07), bộ nhớ đầy (AC-09), chỉ request tới origin app và tile OSM.
+- **E2E (Playwright)**: chạy code adapter thật với **GPS giả lập** và đồng hồ trang được điều khiển — quyền, ẩn/hiện → 2 đoạn không nối, giữ dữ liệu qua reload (AC-05), khôi phục + đoạn mới, tạm dừng (AC-03), hai tab (AC-07), bộ nhớ đầy (AC-09), chỉ request tới origin app và tile OSM, header bảo mật trên mọi route và **không có vi phạm CSP** trong cả luồng ghi chuyến; `fetch` tới origin khác bị chặn.
 - **Hiệu năng:** `analyzeTrip` 10 000 điểm ~100 ms (lần đầu) / ~40 ms (warm) trên máy phát triển.
 
 > Kết quả Playwright là **mô phỏng**, không chứng minh hành vi GPS trên thiết bị thật.
@@ -145,9 +146,54 @@ Ghi kết quả như **quan sát**, không coi là SLA; không gộp kết quả
 - Bản đồ nền mặc định là **OpenStreetMap tiles** (có attribution, không prefetch/bulk download). Việc tải tile tiết lộ khu vực bạn đang xem cho nhà cung cấp bản đồ — được nêu trong UI.
 - Có thể đổi nguồn tile qua `VITE_TILE_URL`/`VITE_TILE_ATTRIBUTION` (xem `.env.example`). **Không** đặt API key bí mật vào biến `VITE_*` — chúng nằm trong bundle công khai.
 
-## Deploy
+## Deploy (Cloudflare Pages — miễn phí)
 
-Cloudflare Pages (chi tiết hoàn thiện ở M5): build command `npm run build`, output `dist`, Node ≥ 22.22, production branch `main`. Pages tự phục vụ SPA fallback khi không có `404.html`.
+**Vì sao Cloudflare Pages (ADR-11, đối chiếu 06/11/2026):** gói Free không giới hạn băng thông/request cho file tĩnh, **cho phép dùng thương mại** (Vercel Hobby thì không; Netlify Free tính theo credit và tạm dừng site khi hết), HTTPS tự động, mỗi nhánh/PR có URL preview riêng, hỗ trợ file `_headers`. Giới hạn Free: 500 build/tháng, 1 build cùng lúc, 20 phút/build, 20 000 file, 25 MiB/file — dư cho app này (~10 file).
+
+### Thiết lập một lần (~5 phút, trên dashboard)
+
+1. Đăng nhập <https://dash.cloudflare.com> (tạo tài khoản miễn phí nếu chưa có) → **Workers & Pages** → **Create** → tab **Pages** → **Import an existing Git repository**.
+2. Kết nối GitHub, chọn repo `hieutt-vinatex/route-compare`.
+3. Cấu hình build:
+
+   | Mục | Giá trị |
+   |---|---|
+   | Production branch | `main` |
+   | Framework preset | `None` |
+   | Build command | `npm run build` |
+   | Build output directory | `dist` |
+   | Root directory | *(để trống)* |
+
+   Không cần biến môi trường: build image v3 mặc định Node 22.23.x (≥ 22.22). Nếu log báo lỗi cài Node từ `.nvmrc`, thêm biến `NODE_VERSION` = `22.23.4`.
+4. **Save and Deploy** → app chạy tại `https://<tên-project>.pages.dev` (HTTPS, GPS dùng được trên điện thoại).
+5. Từ đó: push lên `main` → deploy production; push nhánh khác/mở PR → bản **preview** `https://<nhánh>.<tên-project>.pages.dev` (Cloudflare tự gắn `noindex` cho preview).
+
+Tùy chọn: giới hạn người truy cập (pilot nội bộ) bằng **Cloudflare Access** (Zero Trust, miễn phí tới 50 người dùng); gắn tên miền riêng trong *Custom domains*.
+
+### Header bảo mật và quyền riêng tư
+
+`npm run build` sinh `dist/_headers` từ `deploy/securityHeaders.ts` (Cloudflare Pages áp dụng cho mọi đường dẫn, kể cả SPA fallback; `vite preview` gửi cùng header nên E2E chạy dưới đúng chính sách production):
+
+- **CSP** `connect-src 'self'`: mã trang **không thể** gửi dữ liệu (fetch/XHR/beacon) tới origin khác — E2E kiểm chứng; `img-src` chỉ cho phép origin tile đang cấu hình (tự suy ra từ `VITE_TILE_URL`); không `unsafe-inline`/`unsafe-eval`; cấm nhúng iframe.
+- `Permissions-Policy` chỉ cho origin app dùng vị trí/wake lock; tắt camera/micro.
+- `Referrer-Policy: strict-origin-when-cross-origin` — gửi origin (không gửi đường dẫn) cho máy chủ tile, đáp ứng yêu cầu Referer của OSM.
+- File `/assets/*` (có hash) cache 1 năm; `index.html` luôn kiểm tra lại.
+
+### Bản đồ nền khi chạy production
+
+| Lựa chọn | Khi nào | Ghi chú |
+|---|---|---|
+| **OSM tile chuẩn** (mặc định) | Pilot, ít người dùng | Miễn phí, *best-effort*, không SLA; OSMF có thể chặn nếu dùng nặng. App đã tuân thủ: attribution, không prefetch/tải hàng loạt, có Referer. |
+| **CARTO basemaps** (cần key miễn phí) | Dùng chính thức trong công ty / nhiều người | Free cho dùng thương mại tới **1 triệu tile request/tháng**; key là key công khai theo dự án (không phải bí mật). |
+
+Đổi sang CARTO: lấy key tại <https://carto.com/basemaps/apikey>, thêm 2 biến môi trường (Production + Preview) trong Pages → **Settings → Variables**, rồi **Retry deployment** (biến `VITE_*` được nhúng lúc build; CSP tự cập nhật):
+
+```text
+VITE_TILE_URL = https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=<KEY>
+VITE_TILE_ATTRIBUTION = &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>, &copy; <a href="https://carto.com/attribution/" target="_blank" rel="noopener noreferrer">CARTO</a>
+```
+
+Không dùng gói free của Stadia Maps/MapTiler cho mục đích công ty (chỉ cho phi thương mại).
 
 ## Tài liệu đặc tả
 

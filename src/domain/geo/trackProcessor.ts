@@ -21,6 +21,7 @@ import { median } from '../analytics/speed';
 import type { GpsConfig } from '../models/gpsConfig';
 import type { RawGpsSample, RejectCode, TransportMode } from '../models/types';
 import { haversineM } from './haversine';
+import { resolvedSpeedMps, stopConfirmedAt } from './motionEvidence';
 
 export type SegmentOpenReason =
   'START' | 'AFTER_GAP' | 'AFTER_HIDDEN' | 'AFTER_PAUSE' | 'AFTER_RESTART' | 'AFTER_CLOCK_RESET';
@@ -45,8 +46,8 @@ export interface AcceptedFix {
 
 export type RejectCounts = Readonly<Partial<Record<RejectCode, number>>>;
 
-/** Fixes of the open segment kept for live speed (bounded). */
-const RECENT_FIXES_MAX = 30;
+/** Fixes of the open segment kept for live speed and stop confirmation (bounded). */
+const RECENT_FIXES_MAX = 120;
 
 export interface TrackProcessorState {
   readonly transportMode: TransportMode;
@@ -443,9 +444,11 @@ export function hasFreshFix(state: TrackProcessorState, now: number, config: Gps
  * Live “current speed” (m/s), or null when there is not enough recent evidence (UI shows “—”).
  * 1. Provider speed (coords.speed, Doppler) when the last fixes report it: median of the last
  *    `speedSmoothingWindow` values.
- * 2. Otherwise the median, over the last `speedSmoothingWindow` fixes, of the displacement speed
- *    across ≤ `liveSpeedWindowMs` ending at each fix — counted only when the displacement exceeds
- *    the combined position uncertainty (standing still reads 0, not GPS jitter).
+ * 2. 0 only for a confirmed stop (BR-07): the last stop.dwellMs of fixes are compact and slow.
+ * 3. Otherwise the median, over the last `speedSmoothingWindow` fixes, of the displacement speed
+ *    resolved beyond the position uncertainty (motionEvidence.resolvedSpeedMps) over a base of
+ *    ≤ liveSpeedWindowMs — reaching further back (slow walking) until the displacement leaves the
+ *    uncertainty. Movement still inside the uncertainty is unknown (null), never 0.
  */
 export function liveSpeedMps(
   state: TrackProcessorState,
@@ -466,47 +469,22 @@ export function liveSpeedMps(
     return median(provider);
   }
 
+  if (stopConfirmedAt(fixes, fixes.length - 1, config)) return 0;
+
   // Median over the last few window ends, so one spike cannot dominate.
+  const first = fixes[0];
   const speeds: number[] = [];
   for (let i = Math.max(0, fixes.length - config.speedSmoothingWindow); i < fixes.length; i += 1) {
-    const v = gatedWindowSpeedMps(fixes, i, config);
+    const end = fixes[i];
+    if (first === undefined || end === undefined) continue;
+    // Early in a segment the base is whatever span exists (≥ liveSpeedMinEdges edges).
+    const minBaseMs = Math.min(
+      config.liveSpeedWindowMs,
+      end.sourceTimestamp - first.sourceTimestamp,
+    );
+    if (minBaseMs <= 0) continue;
+    const v = resolvedSpeedMps(fixes, i, config, minBaseMs);
     if (v !== null) speeds.push(v);
   }
   return median(speeds);
-}
-
-/** Minimal fix shape for displacement speeds (AcceptedFix, ReplayedFix…). */
-export interface SpeedFix {
-  readonly lat: number;
-  readonly lng: number;
-  readonly sourceTimestamp: number;
-  readonly accuracyM: number | null;
-}
-
-/**
- * Displacement speed (m/s) over ≤ liveSpeedWindowMs ending at fixes[endIndex] (same segment).
- * A displacement inside the combined position uncertainty reads 0 (standing still) — but only once
- * the window spans at least half its length; a shorter window is not evidence yet (null).
- */
-export function gatedWindowSpeedMps(
-  fixes: readonly SpeedFix[],
-  endIndex: number,
-  config: GpsConfig,
-): number | null {
-  const end = fixes[endIndex];
-  if (end === undefined) return null;
-  let from: SpeedFix | undefined;
-  for (let i = endIndex - 1; i >= 0; i -= 1) {
-    const f = fixes[i];
-    if (f === undefined || end.sourceTimestamp - f.sourceTimestamp > config.liveSpeedWindowMs)
-      break;
-    from = f;
-  }
-  if (from === undefined) return null;
-  const dtMs = end.sourceTimestamp - from.sourceTimestamp;
-  if (dtMs <= 0) return null;
-  const movedM = haversineM(from, end);
-  const uncertaintyM = Math.hypot(from.accuracyM ?? 0, end.accuracyM ?? 0);
-  if (movedM >= uncertaintyM) return movedM / (dtMs / 1000);
-  return dtMs >= config.liveSpeedWindowMs / 2 ? 0 : null;
 }
