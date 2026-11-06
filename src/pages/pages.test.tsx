@@ -20,6 +20,13 @@ vi.mock('@/components/map/TrackMap', () => ({
   ),
 }));
 
+// Chart.js needs a real canvas (Playwright covers it); here only the chart's presence matters.
+vi.mock('react-chartjs-2', () => ({
+  Line: (props: { 'aria-label'?: string }) => (
+    <canvas data-testid="chart-canvas" aria-label={props['aria-label']} />
+  ),
+}));
+
 let services: TestServices;
 
 beforeEach(() => {

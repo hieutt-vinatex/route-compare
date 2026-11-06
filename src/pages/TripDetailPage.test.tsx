@@ -17,6 +17,13 @@ vi.mock('@/components/map/TrackMap', () => ({
   ),
 }));
 
+// Chart.js needs a real canvas (Playwright covers it); here only the chart's presence matters.
+vi.mock('react-chartjs-2', () => ({
+  Line: (props: { 'aria-label'?: string }) => (
+    <canvas data-testid="chart-canvas" aria-label={props['aria-label']} />
+  ),
+}));
+
 let services: TestServices;
 beforeEach(() => {
   services = createTestServices();
@@ -86,6 +93,16 @@ describe('Trip Detail from one analysis (FR-10, RT-302, RT-304)', () => {
     );
     // ~3 minutes between the two stretches (plus start-up), from the analysis.
     expect(screen.getByTestId('detail-gps-gap')).toHaveTextContent(/^03:0\d$/);
+  });
+
+  it('plots speed over time with a text summary (RT-303)', async () => {
+    await seedCompleted(withGap(), 240_000);
+    renderApp('/trips/d1', services);
+    expect(
+      await screen.findByRole('heading', { name: 'Tốc độ theo thời gian' }),
+    ).toBeInTheDocument();
+    const chart = await screen.findByTestId('chart-canvas');
+    expect(chart.getAttribute('aria-label')).toMatch(/không xác định/);
   });
 
   it('shows units, and “—” for speeds without evidence', async () => {

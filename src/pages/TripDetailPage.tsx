@@ -4,19 +4,23 @@ import { COPY, lowGpsCopy } from '@/app/copy';
 import {
   EVENT_LABELS,
   formatDateTime,
+  formatDuration,
   formatPercent,
+  formatSpeedKmh,
   formatTime,
   QUALITY_LABELS,
   TRANSPORT_MODE_LABELS,
 } from '@/app/format';
 import { LazyTrackMap } from '@/components/map/LazyTrackMap';
 import { FormulaNotes } from '@/components/trip/FormulaNotes';
+import { LazySpeedChart } from '@/components/trip/LazySpeedChart';
 import { qualityTone } from '@/components/trip/quality';
 import { TripStats, type TripCounts } from '@/components/trip/TripStats';
 import { buttonClass } from '@/components/ui/buttonClass';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Notice } from '@/components/ui/Notice';
 import { StatusPill } from '@/components/ui/StatusPill';
+import { buildSpeedSeries } from '@/domain/analytics/speedSeries';
 import { segmentsFromPoints } from '@/domain/geo/segments';
 import { incompleteReasons, type IncompleteReason } from '@/domain/trip/incompleteReasons';
 import { useServices } from '@/hooks/useServices';
@@ -44,6 +48,12 @@ export function TripDetailPage() {
   const liveSegments = useMemo(
     () => (metrics === null && points !== undefined ? segmentsFromPoints(points) : []),
     [metrics, points],
+  );
+  const startedAt = data?.trip.startedAt;
+  const series = useMemo(
+    () =>
+      metrics === null || startedAt === undefined ? null : buildSpeedSeries(metrics, startedAt),
+    [metrics, startedAt],
   );
 
   if (detail.status === 'loading') {
@@ -147,6 +157,17 @@ export function TripDetailPage() {
       <p className="text-sm text-slate-600">{COPY.measuredDistanceNote}</p>
 
       <TripStats metrics={metrics} counts={counts} />
+      {finished && series !== null && (
+        <section aria-labelledby="speed-chart" className="space-y-2">
+          <h2 id="speed-chart" className="text-base font-semibold text-slate-900">
+            Tốc độ theo thời gian
+          </h2>
+          <LazySpeedChart
+            series={series}
+            summary={`Tốc độ theo thời gian. Cao nhất ${formatSpeedKmh(metrics.maxSpeedKmh)}; ${formatDuration(metrics.unknownMs)} không xác định; ${formatDuration(metrics.pausedMs)} tạm dừng.`}
+          />
+        </section>
+      )}
       {finished && <FormulaNotes config={config} />}
 
       <section aria-labelledby="trip-events" className="space-y-2">
