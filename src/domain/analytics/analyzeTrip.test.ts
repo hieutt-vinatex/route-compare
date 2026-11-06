@@ -4,57 +4,13 @@
  * The engine replays persisted raw points + events, so it is the source of truth for summaries.
  */
 import { describe, expect, it } from 'vitest';
-import {
-  ORIGIN,
-  stationaryJitter,
-  straightLine,
-  T0,
-  toSample,
-  type SampleSpec,
-} from '@/tests/fixtures/gpsFixtures';
+import { ORIGIN, stationaryJitter, straightLine, T0 } from '@/tests/fixtures/gpsFixtures';
+import { persistedTrip as persisted, samples, type Step } from '@/tests/fixtures/persistedTrip';
 import { createControllerHarness } from '@/tests/harness';
 import { destinationPoint } from '../geo/haversine';
 import { DEFAULT_GPS_CONFIG as cfg } from '../models/gpsConfig';
-import type { GpsPoint, TransportMode, Trip, TripEvent, TripEventType } from '../models/types';
-import { createTrip } from '../trip/tripFactory';
+import type { TransportMode } from '../models/types';
 import { analyzeTrip } from './analyzeTrip';
-
-type Step = { readonly sample: SampleSpec } | { readonly event: TripEventType; readonly t: number };
-
-/** Builds what the repository would hold: raw points + events sharing one sequence. */
-function persisted(steps: readonly Step[], mode: TransportMode = 'MOTORBIKE') {
-  const trip: Trip = createTrip({ id: 'trip', name: 'x', transportMode: mode, startedAt: T0 });
-  const points: GpsPoint[] = [];
-  const events: TripEvent[] = [];
-  let seq = 0;
-  for (const step of steps) {
-    seq += 1;
-    if ('sample' in step) {
-      points.push({
-        id: `p${seq}`,
-        tripId: trip.id,
-        sourceSeq: seq,
-        ...toSample(step.sample),
-        segmentId: null,
-        accepted: false,
-        rejectCode: null,
-        derivedSpeedMps: null,
-      });
-    } else {
-      events.push({
-        id: `e${seq}`,
-        tripId: trip.id,
-        seq,
-        timestamp: T0 + step.t,
-        type: step.event,
-        metadata: null,
-      });
-    }
-  }
-  return { trip, points, events };
-}
-
-const samples = (specs: readonly SampleSpec[]): Step[] => specs.map((sample) => ({ sample }));
 
 function analyze(steps: readonly Step[], endT: number, mode?: TransportMode) {
   const { trip, points, events } = persisted(steps, mode);

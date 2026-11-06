@@ -39,6 +39,8 @@ export interface TripMetrics {
   readonly unmeasured: readonly Interval[];
   /** App-clock user pauses (PAUSE → RESUME, or → End), clipped to the trip. */
   readonly paused: readonly Interval[];
+  /** Replayed accepted fixes, one polyline per segment (never joined). */
+  readonly segments: readonly (readonly LatLng[])[];
 }
 
 export interface Interval {
@@ -146,6 +148,7 @@ export function analyzeTrip(input: AnalyzeTripInput): TripMetrics {
     edges,
     unmeasured,
     paused: pauses,
+    segments: replay.segments,
   };
 }
 

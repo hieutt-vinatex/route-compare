@@ -1,25 +1,26 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router';
-import { COPY } from '@/app/copy';
+import { COPY, lowGpsCopy } from '@/app/copy';
 import {
   EVENT_LABELS,
   formatDateTime,
-  formatDistance,
-  formatDuration,
   formatPercent,
-  formatSpeedKmh,
   formatTime,
   QUALITY_LABELS,
   TRANSPORT_MODE_LABELS,
 } from '@/app/format';
 import { LazyTrackMap } from '@/components/map/LazyTrackMap';
+import { FormulaNotes } from '@/components/trip/FormulaNotes';
+import { qualityTone } from '@/components/trip/quality';
+import { TripStats, type TripCounts } from '@/components/trip/TripStats';
 import { buttonClass } from '@/components/ui/buttonClass';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { MetricCard } from '@/components/ui/MetricCard';
 import { Notice } from '@/components/ui/Notice';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { segmentsFromPoints } from '@/domain/geo/segments';
 import { incompleteReasons, type IncompleteReason } from '@/domain/trip/incompleteReasons';
+import { useServices } from '@/hooks/useServices';
+import { useTripAnalysis } from '@/hooks/useTripAnalysis';
 import { useTripDetail } from '@/hooks/useTrips';
 
 const REASON_COPY: Readonly<Record<IncompleteReason, string>> = {
@@ -34,16 +35,21 @@ const REASON_COPY: Readonly<Record<IncompleteReason, string>> = {
 
 export function TripDetailPage() {
   const { id } = useParams();
+  const { config } = useServices();
   const detail = useTripDetail(id);
-  const segments = useMemo(
-    () => (detail.status === 'ready' ? segmentsFromPoints(detail.data.points) : []),
-    [detail],
+  const data = detail.status === 'ready' ? detail.data : null;
+  // A finished trip is replayed from its raw data: map, counts, stats share one source (M10).
+  const metrics = useTripAnalysis(data);
+  const points = data?.points;
+  const liveSegments = useMemo(
+    () => (metrics === null && points !== undefined ? segmentsFromPoints(points) : []),
+    [metrics, points],
   );
 
   if (detail.status === 'loading') {
     return <p className="p-4 text-sm text-slate-600">Đang tải hành trình…</p>;
   }
-  if (detail.status !== 'ready') {
+  if (data === null) {
     return (
       <div className="mx-auto w-full max-w-3xl space-y-4 p-4">
         <EmptyState
@@ -59,40 +65,42 @@ export function TripDetailPage() {
     );
   }
 
-  const { trip, points, events } = detail.data;
-  const accepted = points.filter((p) => p.accepted).length;
-  const start =
-    trip.startLat !== null && trip.startLng !== null
-      ? { lat: trip.startLat, lng: trip.startLng }
-      : null;
-  const end =
-    trip.endLat !== null && trip.endLng !== null ? { lat: trip.endLat, lng: trip.endLng } : null;
-  // Until End, the stored summary is a placeholder: never present it as measured (review I5).
-  const finished = trip.status === 'COMPLETED';
-  const reasons = finished ? incompleteReasons(trip, events) : [];
-  const value = (formatted: string): string => (finished ? formatted : '—');
+  const { trip, events } = data;
+  const finished = metrics !== null;
+  const reasons = finished ? incompleteReasons(trip, events, metrics) : [];
+  const segments = metrics?.segments ?? liveSegments;
+  const counts: TripCounts =
+    metrics === null
+      ? {
+          segments: liveSegments.length,
+          accepted: data.points.filter((p) => p.accepted).length,
+          raw: data.points.length,
+        }
+      : {
+          segments: metrics.segments.length,
+          accepted: metrics.acceptedCount,
+          raw: metrics.rawCount,
+        };
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 p-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-slate-900">{trip.name}</h1>
+        <h1 className="text-2xl font-bold break-words text-slate-900">{trip.name}</h1>
         <p className="text-sm text-slate-600">
           {formatDateTime(trip.startedAt)} · {TRANSPORT_MODE_LABELS[trip.transportMode]}
         </p>
         <div className="flex flex-wrap gap-2 pt-1">
           {!finished ? (
             <StatusPill tone="info" label="Đang ghi / chưa hoàn tất" testId="trip-in-progress" />
-          ) : trip.isIncomplete ? (
+          ) : metrics.isIncomplete ? (
             <StatusPill tone="warn" label="Dữ liệu chưa đầy đủ" testId="trip-incomplete" />
           ) : (
             <StatusPill tone="ok" label="Không phát hiện gián đoạn" />
           )}
-          {finished && trip.qualityLabel !== null && (
+          {finished && (
             <StatusPill
-              tone={
-                trip.qualityLabel === 'GOOD' ? 'ok' : trip.qualityLabel === 'FAIR' ? 'info' : 'warn'
-              }
-              label={`Chất lượng GPS: ${QUALITY_LABELS[trip.qualityLabel]} · độ phủ ${formatPercent(trip.coveragePct)}`}
+              tone={qualityTone(metrics.qualityLabel)}
+              label={`Chất lượng GPS: ${QUALITY_LABELS[metrics.qualityLabel]} · độ phủ ${formatPercent(metrics.coveragePct)}`}
               testId="detail-quality"
             />
           )}
@@ -111,6 +119,11 @@ export function TripDetailPage() {
           {COPY.tripInProgress}
         </Notice>
       )}
+      {finished && metrics.qualityLabel === 'LOW' && (
+        <Notice tone="warn" testId="low-quality">
+          {lowGpsCopy(metrics.unknownMs)}
+        </Notice>
+      )}
       {reasons.length > 0 && (
         <Notice tone="warn" title="Dữ liệu chưa đầy đủ" testId="incomplete-reasons">
           <ul className="list-disc space-y-1 pl-5">
@@ -125,61 +138,16 @@ export function TripDetailPage() {
 
       <LazyTrackMap
         segments={segments}
-        startPoint={start}
-        endPoint={end}
+        startPoint={metrics?.start ?? null}
+        endPoint={metrics?.end ?? null}
         fitToTrack
         className="h-72 sm:h-96"
         ariaLabel="Bản đồ hành trình đã ghi"
       />
       <p className="text-sm text-slate-600">{COPY.measuredDistanceNote}</p>
 
-      <section aria-label="Số liệu hành trình" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <MetricCard
-          label="Quãng đường GPS đo được"
-          value={value(formatDistance(trip.distanceMeasuredM))}
-          testId="detail-distance"
-        />
-        <MetricCard
-          label="Tổng thời gian"
-          value={value(formatDuration(trip.elapsedMs))}
-          testId="detail-elapsed"
-        />
-        <MetricCard
-          label="TB toàn chuyến"
-          value={value(formatSpeedKmh(trip.avgElapsedKmh))}
-          hint="(dựa trên GPS đo được)"
-        />
-        <MetricCard label="Số đoạn GPS" value={String(segments.length)} testId="detail-segments" />
-        <MetricCard label="Mẫu GPS hợp lệ / nhận" value={`${accepted} / ${points.length}`} />
-        <MetricCard
-          label="Thời gian di chuyển"
-          value={value(formatDuration(trip.movingMs))}
-          testId="detail-moving"
-        />
-        <MetricCard label="Dừng" value={value(formatDuration(trip.stoppedMs))} />
-        <MetricCard
-          label="Không xác định"
-          value={value(formatDuration(trip.unknownMs))}
-          hint="thiếu GPS hoặc chưa đủ bằng chứng"
-        />
-        <MetricCard
-          label="Tạm dừng"
-          value={value(formatDuration(trip.pausedMs))}
-          testId="detail-paused"
-        />
-        <MetricCard
-          label="Độ phủ GPS"
-          value={value(formatPercent(trip.coveragePct))}
-          testId="detail-coverage"
-        />
-        <MetricCard label="TB khi di chuyển" value={value(formatSpeedKmh(trip.avgMovingKmh))} />
-        <MetricCard label="Tốc độ cao nhất" value={value(formatSpeedKmh(trip.maxSpeedKmh))} />
-        <MetricCard
-          label="Tốc độ thấp nhất"
-          value={value(formatSpeedKmh(trip.minSpeedKmh))}
-          hint="0 chỉ khi đã xác nhận dừng"
-        />
-      </section>
+      <TripStats metrics={metrics} counts={counts} />
+      {finished && <FormulaNotes config={config} />}
 
       <section aria-labelledby="trip-events" className="space-y-2">
         <h2 id="trip-events" className="text-base font-semibold text-slate-900">

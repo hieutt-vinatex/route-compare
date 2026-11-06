@@ -39,4 +39,21 @@ describe('incompleteReasons (review I5)', () => {
   it('falls back to OTHER when the cause is not recorded', () => {
     expect(incompleteReasons(base, [ev('START'), ev('END')])).toEqual(['OTHER']);
   });
+
+  it('with the replayed analysis, a large GPS gap and missing end fix are named without live events', () => {
+    const analysis = { isIncomplete: true, start: { lat: 1, lng: 2 }, end: null, largeGapCount: 1 };
+    expect(
+      incompleteReasons({ ...base, isIncomplete: false }, [ev('START'), ev('END')], analysis),
+    ).toEqual(['GPS_GAP', 'NO_END_FIX']);
+  });
+
+  it('the analysis decides completeness over a stale stored flag', () => {
+    const analysis = {
+      isIncomplete: false,
+      start: { lat: 1, lng: 2 },
+      end: { lat: 1, lng: 2 },
+      largeGapCount: 0,
+    };
+    expect(incompleteReasons(base, [ev('PAGE_HIDDEN')], analysis)).toEqual([]);
+  });
 });
