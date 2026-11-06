@@ -2,6 +2,7 @@ import Dexie from 'dexie';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { GpsPoint, Trip, TripEvent, TripEventType } from '@/domain/models/types';
+import { TripNotEditableError } from '@/domain/trip/errors';
 import { createTrip } from '@/domain/trip/tripFactory';
 import { RouteTrackDb, SCHEMA_V1 } from '../db';
 import { DexieTripRepository } from './DexieTripRepository';
@@ -196,5 +197,34 @@ describe('DexieTripRepository (RT-201)', () => {
     expect(await v2.table('gpsPoints').count()).toBe(1);
     v2.close();
     db = open(); // keep afterEach happy
+  });
+});
+
+describe('renameTrip (FR-10 actions)', () => {
+  it('changes only the name and updatedAt of a finished trip', async () => {
+    const done = trip('t1', { status: 'COMPLETED', distanceMeasuredM: 1_234, updatedAt: 5 });
+    await repo.create(done);
+    await repo.renameTrip('t1', '  Đi làm qua Láng  ', 9_000);
+    expect(await repo.getTrip('t1')).toEqual({
+      ...done,
+      name: 'Đi làm qua Láng',
+      updatedAt: 9_000,
+    });
+  });
+
+  it('refuses a trip that is still recording or unfinished (BR-01)', async () => {
+    await repo.create(trip('t1', { status: 'RECORDING' }));
+    await expect(repo.renameTrip('t1', 'x', 9_000)).rejects.toBeInstanceOf(TripNotEditableError);
+    await expect(repo.renameTrip('missing', 'x', 9_000)).rejects.toBeInstanceOf(
+      TripNotEditableError,
+    );
+    expect((await repo.getTrip('t1'))?.name).toBe('Trip t1');
+  });
+
+  it('rejects an empty or over-long name and keeps the old one', async () => {
+    await repo.create(trip('t1', { status: 'COMPLETED' }));
+    await expect(repo.renameTrip('t1', '   ', 9_000)).rejects.toBeInstanceOf(RangeError);
+    await expect(repo.renameTrip('t1', 'a'.repeat(121), 9_000)).rejects.toBeInstanceOf(RangeError);
+    expect((await repo.getTrip('t1'))?.name).toBe('Trip t1');
   });
 });

@@ -1,6 +1,10 @@
-import { useEffect, useEffectEvent, useId, useRef } from 'react';
+import { useEffect, useEffectEvent, useId, useRef, type ReactNode, type RefObject } from 'react';
 import { Button } from './Button';
 
+/**
+ * Modal confirm. `children` adds content (e.g. a text field); `initialFocusRef` focuses it instead
+ * of the cancel button when the dialog opens.
+ */
 export function ConfirmDialog({
   open,
   title,
@@ -8,6 +12,9 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel = 'Quay lại',
   danger = false,
+  confirmDisabled = false,
+  initialFocusRef,
+  children,
   onConfirm,
   onCancel,
 }: {
@@ -17,6 +24,9 @@ export function ConfirmDialog({
   confirmLabel: string;
   cancelLabel?: string;
   danger?: boolean;
+  confirmDisabled?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -30,8 +40,8 @@ export function ConfirmDialog({
 
   // Focus moves into the dialog only when it opens — never on later re-renders (review I4).
   useEffect(() => {
-    if (open) cancelRef.current?.focus();
-  }, [open]);
+    if (open) (initialFocusRef?.current ?? cancelRef.current)?.focus();
+  }, [open, initialFocusRef]);
 
   useEffect(() => {
     if (!open) return;
@@ -62,11 +72,16 @@ export function ConfirmDialog({
             {description}
           </p>
         )}
+        {children}
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button ref={cancelRef} variant="secondary" onClick={onCancel}>
             {cancelLabel}
           </Button>
-          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>
+          <Button
+            variant={danger ? 'danger' : 'primary'}
+            disabled={confirmDisabled}
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </Button>
         </div>

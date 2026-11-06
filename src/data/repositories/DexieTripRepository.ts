@@ -6,6 +6,8 @@
 import Dexie from 'dexie';
 import type { GpsPoint, PointProcessingResult, Trip, TripEvent } from '@/domain/models/types';
 import type { TripRepository } from '@/domain/ports';
+import { TripNotEditableError } from '@/domain/trip/errors';
+import { normalizeTripName } from '@/domain/trip/tripName';
 import type { RouteTrackDb } from '../db';
 
 export class DexieTripRepository implements TripRepository {
@@ -28,6 +30,17 @@ export class DexieTripRepository implements TripRepository {
         throw new Error(`Trip ${trip.id} is already completed`);
       }
       await this.db.trips.put(trip);
+    });
+  }
+
+  async renameTrip(id: string, name: string, updatedAt: number): Promise<void> {
+    const normalized = normalizeTripName(name);
+    if (normalized === null) throw new RangeError('Trip name must be 1–120 characters');
+    await this.db.transaction('rw', this.db.trips, async () => {
+      const existing = await this.db.trips.get(id);
+      if (existing?.status !== 'COMPLETED') throw new TripNotEditableError(id);
+      // A field update, not a row overwrite: nothing else the row holds can be lost.
+      await this.db.trips.update(id, { name: normalized, updatedAt });
     });
   }
 

@@ -85,6 +85,11 @@ export interface RecorderLock {
 export interface TripRepository {
   create(trip: Trip): Promise<void>;
   updateTrip(trip: Trip): Promise<void>;
+  /**
+   * Rename a finished trip: only `name` and `updatedAt` change. Throws TripNotEditableError when
+   * the trip is missing or not COMPLETED, RangeError when the name is empty or too long.
+   */
+  renameTrip(id: string, name: string, updatedAt: number): Promise<void>;
   getTrip(id: string): Promise<Trip | undefined>;
   listTrips(): Promise<Trip[]>;
   /** Trips not yet COMPLETED (recording elsewhere, or left over after a reload/crash). */

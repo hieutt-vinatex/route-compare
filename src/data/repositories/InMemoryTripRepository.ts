@@ -1,11 +1,12 @@
 /**
- * TEMPORARY M1 repository — data lives only in memory and is LOST on reload.
- * It implements the same TripRepository port that the Dexie/IndexedDB repository will
- * implement in M2 (RT-201), so the TrackingController does not change.
- * Values are cloned on write/read to mimic persistence semantics (no shared references).
+ * In-memory TripRepository — the test double behind the controller harness (data is LOST on
+ * reload). Same port and rules as DexieTripRepository. Values are cloned on write/read to mimic
+ * persistence semantics (no shared references).
  */
 import type { GpsPoint, PointProcessingResult, Trip, TripEvent } from '@/domain/models/types';
 import type { TripRepository } from '@/domain/ports';
+import { TripNotEditableError } from '@/domain/trip/errors';
+import { normalizeTripName } from '@/domain/trip/tripName';
 
 export class InMemoryTripRepository implements TripRepository {
   private readonly trips = new Map<string, Trip>();
@@ -25,6 +26,17 @@ export class InMemoryTripRepository implements TripRepository {
       return Promise.reject(new Error(`Trip ${trip.id} is already completed`));
     }
     this.trips.set(trip.id, structuredClone(trip));
+    return Promise.resolve();
+  }
+
+  renameTrip(id: string, name: string, updatedAt: number): Promise<void> {
+    const normalized = normalizeTripName(name);
+    if (normalized === null) {
+      return Promise.reject(new RangeError('Trip name must be 1–120 characters'));
+    }
+    const existing = this.trips.get(id);
+    if (existing?.status !== 'COMPLETED') return Promise.reject(new TripNotEditableError(id));
+    this.trips.set(id, { ...existing, name: normalized, updatedAt });
     return Promise.resolve();
   }
 

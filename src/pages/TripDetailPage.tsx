@@ -15,6 +15,7 @@ import { LazyTrackMap } from '@/components/map/LazyTrackMap';
 import { FormulaNotes } from '@/components/trip/FormulaNotes';
 import { LazySpeedChart } from '@/components/trip/LazySpeedChart';
 import { qualityTone } from '@/components/trip/quality';
+import { TripActions } from '@/components/trip/TripActions';
 import { TripStats, type TripCounts } from '@/components/trip/TripStats';
 import { buttonClass } from '@/components/ui/buttonClass';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -190,6 +191,8 @@ export function TripDetailPage() {
           ))}
         </ol>
       </section>
+
+      {finished && <TripActions key={trip.id} trip={trip} />}
 
       <Link to="/history" className={buttonClass('secondary')}>
         Về lịch sử

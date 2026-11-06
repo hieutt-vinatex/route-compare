@@ -140,3 +140,66 @@ describe('Trip Detail from one analysis (FR-10, RT-302, RT-304)', () => {
     expect(screen.getByTestId('detail-distance')).toHaveTextContent('—');
   });
 });
+
+describe('rename and delete (FR-10, FR-14, AC-08)', () => {
+  it('renames through a dialog; the heading and stored name follow', async () => {
+    await seedCompleted(withGap(), 240_000);
+    renderApp('/trips/d1', services);
+    await userEvent.click(await screen.findByRole('button', { name: 'Đổi tên' }));
+    const dialog = screen.getByRole('dialog', { name: 'Đổi tên hành trình' });
+    const input = within(dialog).getByLabelText('Tên hành trình');
+    expect(input).toHaveValue('Đi làm');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Đi làm qua Láng');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Đi làm qua Láng' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect((await services.repository.getTrip('d1'))?.name).toBe('Đi làm qua Láng');
+  });
+
+  it('an empty name cannot be saved', async () => {
+    await seedCompleted(withGap(), 240_000);
+    renderApp('/trips/d1', services);
+    await userEvent.click(await screen.findByRole('button', { name: 'Đổi tên' }));
+    const dialog = screen.getByRole('dialog', { name: 'Đổi tên hành trình' });
+    await userEvent.clear(within(dialog).getByLabelText('Tên hành trình'));
+    expect(within(dialog).getByRole('button', { name: 'Lưu' })).toBeDisabled();
+  });
+
+  it('delete asks to confirm, removes trip, points and events, and returns to History', async () => {
+    await seedCompleted([{ event: 'START', t: 0 }, ...withGap()], 240_000);
+    const { router } = renderApp('/trips/d1', services);
+    await userEvent.click(await screen.findByRole('button', { name: 'Xóa hành trình' }));
+    const dialog = screen.getByRole('dialog', { name: 'Xóa hành trình này?' });
+    expect(dialog).toHaveTextContent('Không thể hoàn tác');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Xóa' }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/history');
+    });
+    expect(await services.repository.getTrip('d1')).toBeUndefined();
+    expect(await services.repository.listPoints('d1')).toEqual([]);
+    expect(await services.repository.listEvents('d1')).toEqual([]);
+  });
+
+  it('cancelling the delete keeps everything', async () => {
+    await seedCompleted(withGap(), 240_000);
+    renderApp('/trips/d1', services);
+    await userEvent.click(await screen.findByRole('button', { name: 'Xóa hành trình' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Quay lại' }),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(await services.repository.getTrip('d1')).toBeDefined();
+  });
+
+  it('offers no rename or delete for a trip that is still recording (BR-01)', async () => {
+    const { trip } = persistedTrip([], 'WALK', 'r1');
+    await services.repository.create({ ...trip, status: 'RECORDING' });
+    renderApp('/trips/r1', services);
+    expect(await screen.findByTestId('trip-in-progress')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Đổi tên' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Xóa hành trình' })).toBeNull();
+  });
+});
