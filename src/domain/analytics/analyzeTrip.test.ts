@@ -323,6 +323,12 @@ describe('coverage and quality (§8)', () => {
     expect(m.isIncomplete).toBe(false);
   });
 
+  it('reports the pause intervals on the app clock (chart bands)', () => {
+    const a = straightLine({ count: 30, speedMps: 5 });
+    const m = analyze([...samples(a), { event: 'PAUSE', t: 30_000 }], 50_000);
+    expect(m.paused).toEqual([{ from: T0 + 30_000, to: T0 + 50_000 }]);
+  });
+
   it('coverage is null when there is no active time', () => {
     const m = analyze([{ event: 'PAUSE', t: 0 }], 0);
     expect(m.coveragePct).toBeNull();

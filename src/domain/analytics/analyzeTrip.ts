@@ -37,6 +37,8 @@ export interface TripMetrics {
   readonly edges: readonly ClassifiedEdge[];
   /** App-clock intervals with no GPS and no pause. */
   readonly unmeasured: readonly Interval[];
+  /** App-clock user pauses (PAUSE → RESUME, or → End), clipped to the trip. */
+  readonly paused: readonly Interval[];
 }
 
 export interface Interval {
@@ -143,6 +145,7 @@ export function analyzeTrip(input: AnalyzeTripInput): TripMetrics {
     end: endPoint,
     edges,
     unmeasured,
+    paused: pauses,
   };
 }
 
