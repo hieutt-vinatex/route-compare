@@ -247,7 +247,7 @@ describe('Tracking flow (AC-01, AC-03, AC-04)', () => {
     cleanup(); // same services (same live trip), fresh UI on the History page
     const { router } = renderApp('/history', services);
     const row = await screen.findByRole('link', { name: /Hành trình/ });
-    expect(row).toHaveTextContent('đang ghi / chưa hoàn tất');
+    expect(row).toHaveTextContent('Chưa kết thúc');
     expect(row).not.toHaveTextContent('0 m đo được');
 
     await act(() => router.navigate(`/trips/${tripId}`));

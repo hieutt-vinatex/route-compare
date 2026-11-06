@@ -11,20 +11,25 @@ const TONES: Record<Tone, { cls: string; icon: IconName }> = {
   neutral: { cls: 'bg-slate-100 text-slate-800 ring-slate-300', icon: 'info' },
 };
 
-/** Status is conveyed by icon + text, not by colour alone (NFR-13). */
+/**
+ * Status is conveyed by icon + text, not by colour alone (NFR-13). `live={false}` for static
+ * badges (e.g. list rows) so screen readers do not announce every row as a live status.
+ */
 export function StatusPill({
   tone,
   label,
   testId,
+  live = true,
 }: {
   tone: Tone;
   label: string;
   testId?: string;
+  live?: boolean;
 }) {
   const t = TONES[tone];
   return (
     <span
-      role="status"
+      role={live ? 'status' : undefined}
       data-testid={testId}
       data-tone={tone}
       className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ring-1 ring-inset ${t.cls}`}
