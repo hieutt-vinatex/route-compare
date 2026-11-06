@@ -6,6 +6,7 @@ import type { SpeedSeries } from '@/domain/analytics/speedSeries';
 import { LazySpeedChart } from './LazySpeedChart';
 import SpeedChart from './SpeedChart';
 import { BANDS_PLUGIN_ID, drawBands } from './speedChartBands';
+import { formatChartMinutes } from './chartTime';
 
 type LineProps = ComponentProps<typeof Line>;
 const captured: { props: LineProps | null } = { props: null };
@@ -78,5 +79,15 @@ describe('drawBands', () => {
     drawBands(ctx, area, toPixel, series.bands);
     expect(fillRect).toHaveBeenNthCalledWith(1, 18, 0, 48, 50); // 0.2 → 18, 1.4 → 66
     expect(fillRect).toHaveBeenNthCalledWith(2, 90, 0, 20, 50); // 2 → 90, 3 → 130 clipped to 110
+  });
+});
+
+describe('formatChartMinutes (x-axis, Q3: minutes since start)', () => {
+  it('labels short and long trips as m:ss without duplicate ticks', () => {
+    expect(formatChartMinutes(0)).toBe('0:00');
+    expect(formatChartMinutes(0.05)).toBe('0:03');
+    expect(formatChartMinutes(0.1)).toBe('0:06');
+    expect(formatChartMinutes(1.5)).toBe('1:30');
+    expect(formatChartMinutes(75)).toBe('75:00');
   });
 });

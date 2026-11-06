@@ -8,15 +8,17 @@ export type IncompleteReason =
 const FATAL_CODES = new Set(['PERMISSION_DENIED', 'UNSUPPORTED', 'INSECURE_CONTEXT']);
 
 /**
- * With `analysis` (the replay of the raw data, Trip Detail) completeness, start/end fixes and large
- * gaps come from it — so a gap is named even when no live GPS_GAP event was recorded.
+ * With `analysis` (the replay of the raw data, Trip Detail) start/end fixes and large gaps come from
+ * it — so a gap is named even when no live GPS_GAP event was recorded. A trip is incomplete when
+ * either source says so: the stored flag also carries what the GPS data cannot show (storage error,
+ * fatal GPS error, recovery — tripFactory.applyMetrics).
  */
 export function incompleteReasons(
   trip: Pick<Trip, 'isIncomplete' | 'startLat' | 'endLat'>,
   events: readonly TripEvent[],
   analysis?: Pick<TripMetrics, 'isIncomplete' | 'start' | 'end' | 'largeGapCount'>,
 ): IncompleteReason[] {
-  const isIncomplete = analysis?.isIncomplete ?? trip.isIncomplete;
+  const isIncomplete = trip.isIncomplete || analysis?.isIncomplete === true;
   if (!isIncomplete) return [];
   const hasStart = analysis === undefined ? trip.startLat !== null : analysis.start !== null;
   const hasEnd = analysis === undefined ? trip.endLat !== null : analysis.end !== null;

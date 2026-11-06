@@ -2,7 +2,7 @@
 
 PWA **web-only, mobile-first, local-first** để ghi và so sánh hành trình GPS thực tế ngay trên trình duyệt. Không backend, không đăng nhập, dữ liệu vị trí không rời thiết bị.
 
-**Đặc tả:** v2.1 (05/11/2026) · **Trạng thái code:** ✅ M0 · M1 · M2 (IndexedDB, lọc GPS, analytics, tạm dừng, khôi phục, khóa một tab) · ⏳ M3–M5 chưa làm — xem [Trạng thái milestone](#trạng-thái-milestone).
+**Đặc tả:** v2.1 (05/11/2026) · **Trạng thái code:** ✅ M0 · M1 · M2 (IndexedDB, lọc GPS, analytics, tạm dừng, khôi phục, khóa một tab) · M3 (Lịch sử tìm/lọc, Chi tiết + biểu đồ tốc độ, đổi tên/xóa) · ⏳ M4–M5 chưa làm — xem [Trạng thái milestone](#trạng-thái-milestone).
 
 > ## ⚠️ Giới hạn nền tảng — không thương lượng
 >
@@ -84,11 +84,11 @@ Luồng một mẫu GPS: `watchPosition` → chuẩn hóa đơn vị → **hàng
 | **M0** | ✅ | Vite + React 19 + TS 6 strict, Tailwind 4, React Router 8 (5 route + 404), ESLint/Prettier, Vitest, Playwright, CI, domain models + `GPS_CONFIG` |
 | **M1** | ✅ | Browser Geolocation adapter (idempotent, mock), Home có trạng thái quyền/vị trí, Tracking (Start/Hủy/Kết thúc có xác nhận, bản đồ nhiều segment, trạng thái tín hiệu, offline), Page Visibility + Wake Lock tùy chọn, hidden→gap không nối, Trip Detail tối thiểu |
 | **M2** | ✅ | Dexie/IndexedDB (schema v1, giao dịch, test migration), mô hình độ lệch đồng hồ, lọc OUTLIER + drift, phân loại MOVING/STOPPED/UNKNOWN, phân hoạch thời gian, coverage + nhãn chất lượng, Tạm dừng/Tiếp tục, checkpoint + timeout khi lưu, khôi phục sau reload, khóa một tab. GPS-001…011 |
-| M3 | ⏳ | Lịch sử (tìm/lọc), chi tiết đầy đủ, biểu đồ tốc độ, nhãn chất lượng |
+| **M3** | ✅ | Lịch sử: tìm theo tên (không phân biệt dấu), lọc phương tiện/ngày/trạng thái, bộ lọc nằm trên URL. Chi tiết: tính lại từ dữ liệu GPS gốc (bản đồ, số liệu, lý do “chưa đầy đủ” cùng một nguồn), cảnh báo chất lượng thấp, “Cách tính các số liệu”, biểu đồ tốc độ Chart.js (tải lười) tô vùng không xác định/tạm dừng, đổi tên, xóa có xác nhận (AC-08) |
 | M4 | ⏳ | So sánh 2–4 chuyến, nhóm A→B, route variant, xuất GPX/CSV/JSON |
 | M5 | ⏳ | PWA app-shell cache, QA & field test. **Đã sẵn sàng deploy** Cloudflare Pages (header bảo mật/CSP, SPA fallback) — xem [Deploy](#deploy-cloudflare-pages--miễn-phí) |
 
-### Giới hạn đã biết sau M2
+### Giới hạn đã biết (sau M3)
 
 - Mọi ngưỡng (độ chính xác 30 m, gap 20 s, dung sai đồng hồ 5 s, drift, outlier, dừng 2 km/h/15 s/20 m) là **heuristic chưa hiệu chỉnh thực địa**.
 - Mẫu GPS đầu tiên của mỗi chuyến chỉ để hiệu chỉnh đồng hồ (mất ~1 s đầu).
@@ -98,7 +98,9 @@ Luồng một mẫu GPS: `watchPosition` → chuẩn hóa đơn vị → **hàng
 - Khi thiết bị không báo `coords.speed`, một lần dừng ngắn hơn 15 s có thể được tính như di chuyển chậm (không bao giờ là “dừng”).
 - Bộ lọc nhiễu tính quãng đường theo “bước neo”: đường cong gắt với độ chính xác 15–30 m bị **đánh giá thấp** (ví dụ mô phỏng đường bậc thang: đo 299 m / thực 419 m).
 - Trên trình duyệt không có Web Locks (iOS < 15.4) khóa một-tab dùng lease 15 s; tab bị ẩn lâu có thể mất quyền ghi cho tab khác và sẽ tự dừng ghi khi phát hiện.
-- Lịch sử (tìm/lọc), biểu đồ (M3) và So sánh/Xuất dữ liệu (M4) chưa làm; trang Chi tiết đã hiện đủ số liệu docs/05 nhưng giao diện còn tối giản.
+- So sánh, nhóm A→B và Xuất/Nhập dữ liệu (M4) chưa làm; chưa lọc theo tuyến (route group, M4).
+- Danh sách Lịch sử không phân trang (phù hợp vài trăm chuyến); biểu đồ tối đa ~600 điểm (gộp theo thời gian).
+- Số liệu ở Lịch sử là bản tóm tắt lưu lúc Kết thúc; trang Chi tiết tính lại từ dữ liệu gốc — trùng nhau khi thuật toán/ngưỡng chưa đổi.
 - IndexedDB có thể bị trình duyệt xóa (xóa dữ liệu site, chế độ riêng tư); sao lưu JSON đến ở M4.
 
 ## Kiểm thử

@@ -103,7 +103,7 @@ export function TripDetailPage() {
         <div className="flex flex-wrap gap-2 pt-1">
           {!finished ? (
             <StatusPill tone="info" label="Đang ghi / chưa hoàn tất" testId="trip-in-progress" />
-          ) : metrics.isIncomplete ? (
+          ) : trip.isIncomplete || metrics.isIncomplete ? (
             <StatusPill tone="warn" label="Dữ liệu chưa đầy đủ" testId="trip-incomplete" />
           ) : (
             <StatusPill tone="ok" label="Không phát hiện gián đoạn" />

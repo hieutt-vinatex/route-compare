@@ -47,13 +47,16 @@ describe('incompleteReasons (review I5)', () => {
     ).toEqual(['GPS_GAP', 'NO_END_FIX']);
   });
 
-  it('the analysis decides completeness over a stale stored flag', () => {
+  it('stored interruption/storage facts keep a trip incomplete when its GPS data alone is complete', () => {
     const analysis = {
       isIncomplete: false,
       start: { lat: 1, lng: 2 },
       end: { lat: 1, lng: 2 },
       largeGapCount: 0,
     };
-    expect(incompleteReasons(base, [ev('PAGE_HIDDEN')], analysis)).toEqual([]);
+    expect(incompleteReasons(base, [ev('STORAGE_ERROR')], analysis)).toEqual(['STORAGE']);
+    expect(
+      incompleteReasons({ ...base, isIncomplete: false }, [ev('STORAGE_ERROR')], analysis),
+    ).toEqual([]);
   });
 });

@@ -14,12 +14,12 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import type { SpeedSeries } from '@/domain/analytics/speedSeries';
+import { formatChartMinutes } from './chartTime';
 import { bandsPlugin, LINE_COLOR } from './speedChartBands';
 
 ChartJS.register(LineController, LineElement, PointElement, LinearScale, Tooltip);
 
 const speedFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
-const minuteFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
 
 function prefersReducedMotion(): boolean {
   return typeof window.matchMedia === 'function'
@@ -43,8 +43,8 @@ export default function SpeedChart({
       x: {
         type: 'linear',
         min: 0,
-        title: { display: true, text: 'Phút từ lúc bắt đầu' },
-        ticks: { callback: (v) => minuteFormat.format(Number(v)) },
+        title: { display: true, text: 'Thời gian từ lúc bắt đầu (phút:giây)' },
+        ticks: { callback: (v) => formatChartMinutes(Number(v)), maxTicksLimit: 7 },
       },
       y: {
         type: 'linear',
@@ -55,7 +55,7 @@ export default function SpeedChart({
     plugins: {
       tooltip: {
         callbacks: {
-          title: (items) => `Phút ${minuteFormat.format(items[0]?.parsed.x ?? 0)}`,
+          title: (items) => `Sau ${formatChartMinutes(items[0]?.parsed.x ?? 0)}`,
           label: (item) => `${speedFormat.format(item.parsed.y ?? 0)} km/h`,
         },
       },

@@ -92,6 +92,10 @@ Kiểm thử **mô phỏng** (Vitest + Playwright với GPS giả lập). Chưa 
 | AC-01, AC-02, AC-04, AC-10 | ✅ | `e2e/tracking.spec.ts` |
 | AC-03, AC-05, AC-07, AC-09 | ✅ | `e2e/persistence.spec.ts` |
 | NFR-02, NFR-06 (header/CSP, không gửi dữ liệu ra ngoài) | ✅ | `deploy/securityHeaders.test.ts`, `e2e/security.spec.ts`, kiểm tra vi phạm CSP cuối `e2e/tracking.spec.ts` |
-| AC-06, AC-08, AC-11 | ⏳ M3/M4 | |
+| AC-08 | ✅ | `DexieTripRepository.test.ts` (xóa cascade nguyên tử, renameTrip), `TripDetailPage.test.tsx`, `e2e/history.spec.ts` (xóa có xác nhận, mất hẳn sau reload) |
+| RT-301 (FR-09) | ✅ | `historyFilter.test.ts` (không dấu, ngày địa phương, trạng thái, URL), `HistoryPage.test.tsx`, `e2e/history.spec.ts` |
+| RT-302, RT-304 (FR-10) | ✅ | `TripDetailPage.test.tsx` (phân tích lại từ dữ liệu gốc, cảnh báo LOW “X phút”, “Cách tính”), `useTrips.test.tsx` (không đọc lại toàn bộ điểm mỗi mẫu) |
+| RT-303 | ✅ | `speedSeries.test.ts` (UNKNOWN = ngắt đường, không phải 0; gộp ≤ 600 điểm), `SpeedChart.test.tsx`, `e2e/history.spec.ts` (canvas, không vi phạm CSP) |
+| AC-06, AC-11 | ⏳ M4 | |
 
 Hiệu năng (§5): `analyzeTrip` trên 10 000 điểm đo được ~100 ms (lần đầu) / ~40 ms (đã warm) trên máy phát triển; trên điện thoại thật cần đo lại.

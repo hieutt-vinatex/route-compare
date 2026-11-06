@@ -131,6 +131,21 @@ describe('Trip Detail from one analysis (FR-10, RT-302, RT-304)', () => {
     expect(notes).toHaveTextContent('0 km/h chỉ khi đã xác nhận dừng');
   });
 
+  it('a trip ended with a storage error stays “chưa đầy đủ” even if its GPS data is complete', async () => {
+    const clean = samples(straightLine({ count: 30, speedMps: 5 }));
+    await seedCompleted([...clean, { event: 'STORAGE_ERROR', t: 29_500 }], 30_000, {
+      isIncomplete: true,
+    });
+    renderApp('/trips/d1', services);
+    expect(await screen.findByTestId('trip-incomplete')).toBeInTheDocument();
+    const reasons = screen.getByTestId('incomplete-reasons');
+    expect(
+      within(reasons)
+        .getAllByRole('listitem')
+        .map((li) => li.dataset.reason),
+    ).toContain('STORAGE');
+  });
+
   it('a trip still recording keeps the “in progress” view with “—” values', async () => {
     const { trip, points } = persistedTrip(samples(straightLine({ count: 5 })), 'WALK', 'r1');
     await services.repository.create({ ...trip, status: 'RECORDING', distanceMeasuredM: 50 });
