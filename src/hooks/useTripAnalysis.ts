@@ -10,18 +10,29 @@ import { useServices } from './useServices';
 
 export function useTripAnalysis(detail: TripDetailData | null): TripMetrics | null {
   const { config } = useServices();
-  // The detail wrapper is rebuilt every render; its row and arrays are stable references.
-  const trip = detail?.trip;
+  // Depend on the fields the analysis reads, so a rename (new row object) does not re-run it.
   const points = detail?.points;
   const events = detail?.events;
+  const status = detail?.trip.status;
+  const startedAt = detail?.trip.startedAt;
+  const endedAt = detail?.trip.endedAt ?? null;
+  const transportMode = detail?.trip.transportMode;
   return useMemo(() => {
-    if (trip?.status !== 'COMPLETED' || points === undefined || events === undefined) return null;
+    if (
+      status !== 'COMPLETED' ||
+      startedAt === undefined ||
+      transportMode === undefined ||
+      points === undefined ||
+      events === undefined
+    ) {
+      return null;
+    }
     return analyzeTrip({
-      trip,
+      trip: { startedAt, transportMode },
       points,
       events,
-      endedAt: trip.endedAt ?? trip.startedAt,
+      endedAt: endedAt ?? startedAt,
       config,
     });
-  }, [trip, points, events, config]);
+  }, [status, startedAt, endedAt, transportMode, points, events, config]);
 }

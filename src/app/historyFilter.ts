@@ -53,7 +53,10 @@ export function filterTrips(
       if (filter.mode !== 'ALL' && trip.transportMode !== filter.mode) return false;
       if (!matchesStatus(trip, filter.status)) return false;
       if (filter.from !== null || filter.to !== null) {
-        const day = localDay.format(trip.startedAt); // en-CA → yyyy-mm-dd
+        const parts = localDay.formatToParts(trip.startedAt);
+        const part = (type: Intl.DateTimeFormatPartTypes): string =>
+          parts.find((p) => p.type === type)?.value ?? '';
+        const day = `${part('year')}-${part('month')}-${part('day')}`;
         if (filter.from !== null && day < filter.from) return false;
         if (filter.to !== null && day > filter.to) return false;
       }
@@ -92,12 +95,10 @@ export function isFilterActive(filter: HistoryFilter): boolean {
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function validDay(value: string | null): string | null {
-  if (value === null) return null;
-  const m = DAY.exec(value);
-  if (m === null) return null;
-  const month = Number(m[2]);
-  const day = Number(m[3]);
-  return month >= 1 && month <= 12 && day >= 1 && day <= 31 ? value : null;
+  if (value === null || !DAY.test(value)) return null;
+  // Round-trip through a real date: 2026-02-31 does not exist.
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value) ? value : null;
 }
 
 export function filterFromParams(params: URLSearchParams): HistoryFilter {

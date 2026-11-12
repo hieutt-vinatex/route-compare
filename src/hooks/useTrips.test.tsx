@@ -66,9 +66,13 @@ describe('useTripDetail (NFR-09, M2 minor M16)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('probe')).toHaveTextContent('x:0');
     });
-    await services.repository.updateTrip({ ...trip, status: 'COMPLETED', name: 'y' });
+    const listPoints = vi.spyOn(services.repository, 'listPoints');
+    // A rename bumps updatedAt; a finished trip's points cannot change, so nothing is re-read.
+    await services.repository.renameTrip('a2', 'y', 12_345);
     await waitFor(() => {
       expect(screen.getByTestId('probe')).toHaveTextContent('y:0');
     });
+    await pause(100);
+    expect(listPoints).not.toHaveBeenCalled();
   });
 });

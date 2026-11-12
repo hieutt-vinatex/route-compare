@@ -51,7 +51,11 @@ export function useTripDetail(id: string | undefined): LoadState<TripDetailData>
     [id, repository],
   );
   const trip = row !== undefined && row !== null && row.ok ? row.value : undefined;
-  const version = trip === undefined ? null : `${trip.id}:${trip.status}:${trip.updatedAt}`;
+  // A finished trip's points/events never change (a rename only bumps updatedAt).
+  const version =
+    trip === undefined
+      ? null
+      : `${trip.id}:${trip.status}:${trip.status === 'COMPLETED' ? '' : String(trip.updatedAt)}`;
   const [track, setTrack] = useState<{
     readonly tripId: string;
     readonly result: Loaded<[GpsPoint[], TripEvent[]]>;

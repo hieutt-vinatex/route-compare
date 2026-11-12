@@ -101,6 +101,13 @@ describe('buildSpeedSeries (RT-303)', () => {
     expect(values(s).filter((v) => v === null)).toHaveLength(1);
   });
 
+  it('reports where the trip ends, including trailing time without GPS', () => {
+    const lost = { from: T0 + 5_000, to: T0 + 15 * MIN };
+    const s = buildSpeedSeries(input(run(0, 5, 'MOVING', 5), { unmeasured: [lost] }), T0);
+    expect(s.endMin).toBe(15);
+    expect(buildSpeedSeries(input(run(0, 6, 'MOVING', 5)), T0).endMin).toBe(0.1);
+  });
+
   it('fewer than 2 speeds → hasData false', () => {
     expect(buildSpeedSeries(input([]), T0).hasData).toBe(false);
     expect(buildSpeedSeries(input(run(0, 1, 'MOVING', 5)), T0).hasData).toBe(false);

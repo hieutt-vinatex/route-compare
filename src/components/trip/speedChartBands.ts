@@ -32,8 +32,20 @@ interface BandContext {
   save(): void;
   restore(): void;
   fillRect(x: number, y: number, w: number, h: number): void;
+  beginPath(): void;
+  rect(x: number, y: number, w: number, h: number): void;
+  clip(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  stroke(): void;
   fillStyle: string | CanvasGradient | CanvasPattern;
+  strokeStyle: string | CanvasGradient | CanvasPattern;
+  lineWidth: number;
 }
+
+/** Diagonal hatch spacing (px) for UNKNOWN bands — told apart from pauses by pattern, not colour. */
+const HATCH_PX = 8;
+export const HATCH_COLOR = 'rgba(71, 85, 105, 0.55)'; // slate-600
 
 /** Fill each band across the full chart height, clipped to the chart area. */
 export function drawBands(
@@ -47,8 +59,23 @@ export function drawBands(
     const x0 = Math.max(area.left, toPixel(band.fromMin));
     const x1 = Math.min(area.right, toPixel(band.toMin));
     if (x1 <= x0) continue;
+    const height = area.bottom - area.top;
     ctx.fillStyle = BAND_COLORS[band.kind];
-    ctx.fillRect(x0, area.top, x1 - x0, area.bottom - area.top);
+    ctx.fillRect(x0, area.top, x1 - x0, height);
+    if (band.kind !== 'UNKNOWN') continue;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, area.top, x1 - x0, height);
+    ctx.clip();
+    ctx.beginPath();
+    for (let x = x0 - height; x < x1; x += HATCH_PX) {
+      ctx.moveTo(x, area.bottom);
+      ctx.lineTo(x + height, area.top);
+    }
+    ctx.strokeStyle = HATCH_COLOR;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
   }
   ctx.restore();
 }

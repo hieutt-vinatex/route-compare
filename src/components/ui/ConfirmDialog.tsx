@@ -38,9 +38,15 @@ export function ConfirmDialog({
     onCancel();
   });
 
-  // Focus moves into the dialog only when it opens — never on later re-renders (review I4).
+  // Focus moves into the dialog only when it opens — never on later re-renders (review I4) —
+  // and returns to the element that opened it when it closes.
   useEffect(() => {
-    if (open) (initialFocusRef?.current ?? cancelRef.current)?.focus();
+    if (!open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    (initialFocusRef?.current ?? cancelRef.current)?.focus();
+    return () => {
+      opener?.focus();
+    };
   }, [open, initialFocusRef]);
 
   useEffect(() => {

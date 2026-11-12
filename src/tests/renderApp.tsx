@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
-import { createMemoryRouter, RouterProvider } from 'react-router';
+import { createMemoryRouter } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
 import { MockGeolocationAdapter } from '@/adapters/geolocation/MockGeolocationAdapter';
 import { MockRecorderLock } from '@/adapters/locks/MockRecorderLock';
 import { MockVisibilityAdapter } from '@/adapters/visibility/MockVisibilityAdapter';

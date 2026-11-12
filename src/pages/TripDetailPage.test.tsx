@@ -111,6 +111,7 @@ describe('Trip Detail from one analysis (FR-10, RT-302, RT-304)', () => {
     expect(await screen.findByTestId('detail-distance')).toHaveTextContent('m');
     expect(screen.getByTestId('detail-max-speed')).toHaveTextContent('—');
     expect(screen.getByTestId('detail-min-speed')).toHaveTextContent('—');
+    expect(screen.getByText('Chưa đủ dữ liệu tốc độ để vẽ biểu đồ.')).toBeInTheDocument();
   });
 
   it('“Cách tính” explains the docs/05 formulas', async () => {
@@ -198,15 +199,30 @@ describe('rename and delete (FR-10, FR-14, AC-08)', () => {
     expect(await services.repository.listEvents('d1')).toEqual([]);
   });
 
-  it('cancelling the delete keeps everything', async () => {
+  it('cancelling the delete keeps everything and returns focus to the button', async () => {
     await seedCompleted(withGap(), 240_000);
     renderApp('/trips/d1', services);
-    await userEvent.click(await screen.findByRole('button', { name: 'Xóa hành trình' }));
+    const remove = await screen.findByRole('button', { name: 'Xóa hành trình' });
+    await userEvent.click(remove);
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Quay lại' }),
     );
     expect(screen.queryByRole('dialog')).toBeNull();
+    expect(remove).toHaveFocus();
     expect(await services.repository.getTrip('d1')).toBeDefined();
+  });
+
+  it('a failed rename is reported inside the dialog, not hidden behind it', async () => {
+    await seedCompleted(withGap(), 240_000);
+    vi.spyOn(services.repository, 'renameTrip').mockRejectedValue(new Error('QuotaExceeded'));
+    renderApp('/trips/d1', services);
+    await userEvent.click(await screen.findByRole('button', { name: 'Đổi tên' }));
+    const dialog = screen.getByRole('dialog', { name: 'Đổi tên hành trình' });
+    await userEvent.type(within(dialog).getByLabelText('Tên hành trình'), ' 2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lưu' }));
+    expect(
+      await within(dialog).findByText('Không đổi được tên hành trình. Hãy thử lại.'),
+    ).toBeInTheDocument();
   });
 
   it('offers no rename or delete for a trip that is still recording (BR-01)', async () => {

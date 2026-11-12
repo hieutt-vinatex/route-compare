@@ -82,7 +82,7 @@ describe('URL query ⇄ filter (Q1)', () => {
   });
 
   it('falls back to “all” for unknown or malformed values', () => {
-    const params = new URLSearchParams('mode=PLANE&status=x&from=5/11/2026&to=2026-13-40');
+    const params = new URLSearchParams('mode=PLANE&status=x&from=5/11/2026&to=2026-02-31');
     expect(filterFromParams(params)).toEqual(DEFAULT_HISTORY_FILTER);
   });
 

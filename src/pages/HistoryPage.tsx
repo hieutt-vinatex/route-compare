@@ -51,10 +51,12 @@ export function HistoryPage() {
     [trips, filter],
   );
   const update = (patch: Partial<HistoryFilter>): void => {
-    setParams(filterToParams({ ...filter, ...patch }), { replace: true });
+    // flushSync: the router otherwise updates in a transition and the controlled input resets
+    // mid-typing (caret jumps, keys lost — Telex/IME).
+    setParams(filterToParams({ ...filter, ...patch }), { replace: true, flushSync: true });
   };
   const clear = (): void => {
-    setParams(filterToParams(DEFAULT_HISTORY_FILTER), { replace: true });
+    setParams(filterToParams(DEFAULT_HISTORY_FILTER), { replace: true, flushSync: true });
   };
   const ids = { q: useId(), mode: useId(), status: useId(), from: useId(), to: useId() };
   const hasTrips = trips.status === 'ready' && trips.data.length > 0;

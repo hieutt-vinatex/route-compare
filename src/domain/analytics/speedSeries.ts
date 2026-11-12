@@ -32,6 +32,8 @@ export interface SpeedSeries {
   readonly bands: readonly SpeedBand[];
   /** At least two plotted speeds — otherwise the UI shows “Chưa đủ dữ liệu tốc độ”. */
   readonly hasData: boolean;
+  /** Trip end in minutes (last point or band): the x-axis must reach it, or trailing lost GPS hides. */
+  readonly endMin: number;
 }
 
 export const SPEED_SERIES_MAX_POINTS = 600;
@@ -80,7 +82,8 @@ export function buildSpeedSeries(
     })),
   ].sort((a, b) => a.fromMin - b.fromMin);
 
-  return { points, bands, hasData: points.filter((p) => p.kmh !== null).length >= 2 };
+  const endMin = Math.max(0, ...points.map((p) => p.tMin), ...bands.map((b) => b.toMin));
+  return { points, bands, endMin, hasData: points.filter((p) => p.kmh !== null).length >= 2 };
 }
 
 function edgeKmh(edge: ClassifiedEdge): number | null {
@@ -89,7 +92,11 @@ function edgeKmh(edge: ClassifiedEdge): number | null {
   return mpsToKmh(edge.speedMps);
 }
 
-/** Equal-time buckets → mean speed per bucket; every run of nulls stays one break. */
+/**
+ * Equal-time buckets → mean speed per bucket; every run of nulls stays one break.
+ * shortcut: each break costs up to 2 extra points, so a trip with hundreds of gaps can exceed
+ * maxPoints (e.g. 1 000 points for a gap every 10 s); Chart.js copes — cap breaks if it ever lags.
+ */
 function bucket(raw: readonly RawPoint[], maxPoints: number): RawPoint[] {
   const first = raw[0];
   const last = raw.at(-1);

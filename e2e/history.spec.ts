@@ -85,7 +85,12 @@ test.describe('M3 history and trip detail (simulated GPS)', () => {
     await page.goto('/history');
     await expect(rows(page)).toHaveCount(2);
     await expectNoHorizontalScroll(page);
-    await page.getByRole('searchbox', { name: 'Tìm theo tên' }).fill('di bo');
+    // Typing in the middle of the text (fix a word, Telex/IME): every key must land at the caret.
+    const search = page.getByRole('searchbox', { name: 'Tìm theo tên' });
+    await search.fill('bo');
+    await search.press('Home');
+    await page.keyboard.type('di ');
+    await expect(search).toHaveValue('di bo');
     await expect(rows(page)).toHaveCount(1);
     await expect(rows(page).first()).toContainText('Đi bộ buổi sáng');
     await expect(page).toHaveURL(/\?q=di\+bo$/);

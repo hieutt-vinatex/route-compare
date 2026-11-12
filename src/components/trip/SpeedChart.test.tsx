@@ -31,6 +31,7 @@ const series: SpeedSeries = {
     { fromMin: 0.2, toMin: 1.4, kind: 'UNKNOWN' },
     { fromMin: 2, toMin: 3, kind: 'PAUSED' },
   ],
+  endMin: 3,
   hasData: true,
 };
 
@@ -58,22 +59,75 @@ describe('SpeedChart (RT-303)', () => {
     expect(legend).toHaveTextContent('Tạm dừng');
   });
 
+  it('the time axis runs to the end of the trip, so trailing lost GPS or a pause stays visible', () => {
+    render(<SpeedChart series={series} summary="tóm tắt" />);
+    expect(captured.props?.options?.scales?.x?.max).toBe(3);
+  });
+
+  it('draws a dot for a speed that has a line break on both sides', () => {
+    const isolated: SpeedSeries = {
+      points: [
+        { tMin: 0.1, kmh: 18 },
+        { tMin: 0.2, kmh: 20 },
+        { tMin: 0.5, kmh: null },
+        { tMin: 0.9, kmh: 25 },
+        { tMin: 1.2, kmh: null },
+      ],
+      bands: [],
+      endMin: 1.2,
+      hasData: true,
+    };
+    render(<SpeedChart series={isolated} summary="tóm tắt" />);
+    const radius = captured.props?.data.datasets[0]?.pointRadius;
+    expect(Array.isArray(radius) ? radius.map((r) => r > 0) : radius).toEqual([
+      false,
+      false,
+      false,
+      true,
+      false,
+    ]);
+  });
+
   it('describes the chart for screen readers', () => {
     render(<SpeedChart series={series} summary="Cao nhất 20 km/h" />);
     expect(screen.getByRole('img', { name: /Cao nhất 20 km\/h/ })).toBeInTheDocument();
   });
 
   it('without enough speeds shows a message and loads no chart', () => {
-    render(<LazySpeedChart series={{ points: [], bands: [], hasData: false }} summary="" />);
+    render(
+      <LazySpeedChart series={{ points: [], bands: [], endMin: 0, hasData: false }} summary="" />,
+    );
     expect(screen.getByText('Chưa đủ dữ liệu tốc độ để vẽ biểu đồ.')).toBeInTheDocument();
     expect(screen.queryByTestId('chart-canvas')).toBeNull();
   });
 });
 
+const fakeContext = () => ({
+  save: vi.fn(),
+  restore: vi.fn(),
+  fillRect: vi.fn(),
+  beginPath: vi.fn(),
+  rect: vi.fn(),
+  clip: vi.fn(),
+  moveTo: vi.fn(),
+  lineTo: vi.fn(),
+  stroke: vi.fn(),
+  fillStyle: '',
+  strokeStyle: '',
+  lineWidth: 1,
+});
+
 describe('drawBands', () => {
+  it('hatches UNKNOWN bands so they differ from pauses without relying on colour', () => {
+    const ctx = fakeContext();
+    const area = { left: 0, right: 200, top: 0, bottom: 50 };
+    drawBands(ctx, area, (min) => min * 40, series.bands);
+    expect(ctx.stroke).toHaveBeenCalledTimes(1); // the UNKNOWN band only
+  });
+
   it('shades each band inside the chart area only', () => {
-    const fillRect = vi.fn();
-    const ctx = { save: vi.fn(), restore: vi.fn(), fillRect, fillStyle: '' };
+    const ctx = fakeContext();
+    const { fillRect } = ctx;
     const area = { left: 10, right: 110, top: 0, bottom: 50 };
     const toPixel = (min: number): number => 10 + min * 40; // 0 → 10 px, 2.5 → 110 px
     drawBands(ctx, area, toPixel, series.bands);

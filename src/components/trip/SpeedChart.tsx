@@ -15,7 +15,7 @@ import {
 import { Line } from 'react-chartjs-2';
 import type { SpeedSeries } from '@/domain/analytics/speedSeries';
 import { formatChartMinutes } from './chartTime';
-import { bandsPlugin, LINE_COLOR } from './speedChartBands';
+import { bandsPlugin, HATCH_COLOR, LINE_COLOR } from './speedChartBands';
 
 ChartJS.register(LineController, LineElement, PointElement, LinearScale, Tooltip);
 
@@ -43,6 +43,7 @@ export default function SpeedChart({
       x: {
         type: 'linear',
         min: 0,
+        max: series.endMin,
         title: { display: true, text: 'Thời gian từ lúc bắt đầu (phút:giây)' },
         ticks: { callback: (v) => formatChartMinutes(Number(v)), maxTicksLimit: 7 },
       },
@@ -78,7 +79,14 @@ export default function SpeedChart({
                 borderColor: LINE_COLOR,
                 backgroundColor: LINE_COLOR,
                 borderWidth: 2,
-                pointRadius: 0,
+                // A speed with a break on both sides has no line to draw: show it as a dot.
+                pointRadius: series.points.map((p, i, all) =>
+                  p.kmh !== null &&
+                  (all[i - 1]?.kmh ?? null) === null &&
+                  (all[i + 1]?.kmh ?? null) === null
+                    ? 3
+                    : 0,
+                ),
                 pointHitRadius: 6,
                 spanGaps: false,
                 tension: 0,
@@ -99,7 +107,13 @@ export default function SpeedChart({
         </span>
         {kinds.has('UNKNOWN') && (
           <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden="true" className="inline-block h-3 w-5 rounded-sm bg-slate-500/25" />
+            <span
+              aria-hidden="true"
+              className="inline-block h-3 w-5 rounded-sm bg-slate-500/25"
+              style={{
+                backgroundImage: `repeating-linear-gradient(135deg, ${HATCH_COLOR} 0 1px, transparent 1px 6px)`,
+              }}
+            />
             Không xác định (không vẽ tốc độ)
           </span>
         )}

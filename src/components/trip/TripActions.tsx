@@ -51,13 +51,16 @@ export function TripActions({ trip }: { readonly trip: Trip }) {
     }, 'Không xóa được hành trình. Dữ liệu vẫn còn nguyên; hãy thử lại.');
   };
 
+  const errorNotice = error !== null && (
+    <div className="mt-3">
+      <Notice tone="error" testId="trip-action-error">
+        {error}
+      </Notice>
+    </div>
+  );
+
   return (
     <section aria-label="Thao tác với hành trình" className="space-y-2">
-      {error !== null && (
-        <Notice tone="error" testId="trip-action-error">
-          {error}
-        </Notice>
-      )}
       <div className="flex flex-wrap gap-2">
         <Button
           variant="secondary"
@@ -108,6 +111,7 @@ export function TripActions({ trip }: { readonly trip: Trip }) {
             className="block min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base"
           />
         </div>
+        {errorNotice}
       </ConfirmDialog>
 
       <ConfirmDialog
@@ -119,7 +123,9 @@ export function TripActions({ trip }: { readonly trip: Trip }) {
         confirmDisabled={working}
         onConfirm={confirmDelete}
         onCancel={close}
-      />
+      >
+        {errorNotice}
+      </ConfirmDialog>
     </section>
   );
 }
