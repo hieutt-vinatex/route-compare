@@ -35,7 +35,7 @@ npm run dev            # http://localhost:5173
 | `npm run e2e:install` | Tải Chromium cho Playwright (một lần) |
 | `npm run e2e` | Playwright trên bản build, viewport 360/390/1280, **GPS mô phỏng** |
 
-CI (`.github/workflows/ci.yml`): `npm ci → typecheck → lint → format:check → test → build → e2e`.
+CI/CD (`.github/workflows/ci.yml`): `npm ci → typecheck → lint → format:check → test → build → e2e → deploy` (deploy chỉ khi push `main` và mọi kiểm tra đều đạt).
 
 ### Demo không cần GPS (chỉ khi dev)
 
@@ -153,23 +153,20 @@ Ghi kết quả như **quan sát**, không coi là SLA; không gộp kết quả
 
 **Vì sao Cloudflare Pages (ADR-11, đối chiếu 06/11/2026):** gói Free không giới hạn băng thông/request cho file tĩnh, **cho phép dùng thương mại** (Vercel Hobby thì không; Netlify Free tính theo credit và tạm dừng site khi hết), HTTPS tự động, mỗi nhánh/PR có URL preview riêng, hỗ trợ file `_headers`. Giới hạn Free: 500 build/tháng, 1 build cùng lúc, 20 phút/build, 20 000 file, 25 MiB/file — dư cho app này (~10 file).
 
-### Thiết lập một lần (~5 phút, trên dashboard)
+### GitHub Actions → project hiện tại
 
-1. Đăng nhập <https://dash.cloudflare.com> (tạo tài khoản miễn phí nếu chưa có) → **Workers & Pages** → **Create** → tab **Pages** → **Import an existing Git repository**.
-2. Kết nối GitHub, chọn repo `hieutt-vinatex/route-compare`.
-3. Cấu hình build:
+Production: **<https://routetrack-d29.pages.dev>** · project Pages `routetrack` · repository [`hieutt-vinatex/route-compare`](https://github.com/hieutt-vinatex/route-compare).
 
-   | Mục | Giá trị |
-   |---|---|
-   | Production branch | `main` |
-   | Framework preset | `None` |
-   | Build command | `npm run build` |
-   | Build output directory | `dist` |
-   | Root directory | *(để trống)* |
+Project dùng **Direct Upload**. Cloudflare không hỗ trợ chuyển project này sang Git integration; workflow GitHub Actions deploy trực tiếp bằng Wrangler để giữ nguyên URL ([hướng dẫn Cloudflare](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/)).
 
-   Không cần biến môi trường: build image v3 mặc định Node 22.23.x (≥ 22.22). Nếu log báo lỗi cài Node từ `.nvmrc`, thêm biến `NODE_VERSION` = `22.23.4`.
-4. **Save and Deploy** → app chạy tại `https://<tên-project>.pages.dev` (HTTPS, GPS dùng được trên điện thoại).
-5. Từ đó: push lên `main` → deploy production; push nhánh khác/mở PR → bản **preview** `https://<nhánh>.<tên-project>.pages.dev` (Cloudflare tự gắn `noindex` cho preview).
+Thiết lập credential một lần:
+
+1. Tại [Cloudflare Account API Tokens](https://dash.cloudflare.com/e7420968b9c4ed515c72372e953f9033/api-tokens), tạo custom token có quyền **Account → Cloudflare Pages → Edit**, chỉ cho tài khoản này.
+2. Tại [GitHub → Settings → Secrets and variables → Actions](https://github.com/hieutt-vinatex/route-compare/settings/secrets/actions), tạo **repository secret** `CLOUDFLARE_API_TOKEN` chứa token. Không đưa token vào code hoặc biến `VITE_*`.
+
+Mỗi push lên `main` chạy toàn bộ CI, rồi deploy chính thư mục `dist` đã được build/E2E kiểm tra, bao gồm `_headers`. Pull request chỉ chạy kiểm tra, không deploy và không dùng token Cloudflare. Workflow dùng Node từ `.nvmrc`; GitHub token chỉ cần `contents: read`.
+
+Xem tiến trình tại [GitHub Actions](https://github.com/hieutt-vinatex/route-compare/actions/workflows/ci.yml). Nếu test/build lỗi, production giữ bản đã deploy trước đó. Nếu token thiếu/hết hạn/bị thu hồi, cập nhật secret rồi chọn **Re-run failed jobs** ở lần chạy **mới nhất của `main`**; chạy lại một lần cũ sẽ deploy commit cũ. Workflow này không tạo preview cho PR hoặc nhánh khác.
 
 Tùy chọn: giới hạn người truy cập (pilot nội bộ) bằng **Cloudflare Access** (Zero Trust, miễn phí tới 50 người dùng); gắn tên miền riêng trong *Custom domains*.
 
@@ -189,7 +186,7 @@ Tùy chọn: giới hạn người truy cập (pilot nội bộ) bằng **Cloudf
 | **OSM tile chuẩn** (mặc định) | Pilot, ít người dùng | Miễn phí, *best-effort*, không SLA; OSMF có thể chặn nếu dùng nặng. App đã tuân thủ: attribution, không prefetch/tải hàng loạt, có Referer. |
 | **CARTO basemaps** (cần key miễn phí) | Dùng chính thức trong công ty / nhiều người | Free cho dùng thương mại tới **1 triệu tile request/tháng**; key là key công khai theo dự án (không phải bí mật). |
 
-Đổi sang CARTO: lấy key tại <https://carto.com/basemaps/apikey>, thêm 2 biến môi trường (Production + Preview) trong Pages → **Settings → Variables**, rồi **Retry deployment** (biến `VITE_*` được nhúng lúc build; CSP tự cập nhật):
+Đổi sang CARTO: lấy key tại <https://carto.com/basemaps/apikey>, truyền hai biến dưới đây vào môi trường build trên GitHub Actions (job `verify`, gồm cả bước build và E2E), rồi push `main` (biến `VITE_*` được nhúng lúc build; CSP tự cập nhật). Biến trong Pages → **Settings → Variables** không áp dụng cho bản build Direct Upload từ GitHub Actions:
 
 ```text
 VITE_TILE_URL = https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=<KEY>

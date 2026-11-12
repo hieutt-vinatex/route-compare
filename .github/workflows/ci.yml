@@ -38,6 +38,14 @@ jobs:
       - name: E2E (mock geolocation — not a real-device GPS test)
         run: npm run e2e
 
+      - name: Deploy production to Cloudflare Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: e7420968b9c4ed515c72372e953f9033
+          command: pages deploy dist --project-name=routetrack --branch=main
+
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
