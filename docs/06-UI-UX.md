@@ -30,7 +30,7 @@ Bottom navigation (mobile): **Trang chủ | Lịch sử | So sánh**; trang **Đ
 - Stats: `Quãng đường GPS đo được`, `Tổng thời gian`, `Thời gian di chuyển`, `Dừng`, `Không xác định`, `Tạm dừng`, `Tốc độ TB toàn chuyến`, `Tốc độ TB khi chạy`, `Tốc độ cao nhất`, `Tốc độ thấp nhất`.
 - Speed line chart, khoảng UNKNOWN được tô bóng; danh sách các event `PAGE_HIDDEN`, `GPS_GAP`, ...
 - Actions: đổi tên, chọn route group, gắn route variant, xuất, xóa.
-- Cảnh báo khi LOW: **“GPS thiếu dữ liệu trong X phút; quãng đường hiển thị chỉ là phần đã đo được.”**
+- Cảnh báo khi LOW: **“Có X phút không xác định được đang đi hay dừng (mất GPS hoặc GPS chưa đủ chính xác); quãng đường hiển thị chỉ là phần đã đo được.”** X = toàn bộ thời gian *Không xác định* (mất GPS + GPS chưa đủ bằng chứng) — chính phần làm giảm độ phủ và nhãn chất lượng; dưới 1 phút ghi “dưới 1 phút”.
 
 ## 5. History (`/history`)
 

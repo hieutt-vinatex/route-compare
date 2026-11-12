@@ -14,7 +14,7 @@
 
 - Units: domain m, ms, m/s; UI km/m, km/h, “x phút y giây”. Missing → “—”, never 0; 0 km/h only for confirmed STOPPED (BR-07).
 - Label distance as **“Quãng đường GPS đo được”** everywhere (BR-06); incomplete trips always show the warning (FR-10).
-- LOW quality copy (docs/06 §4): “GPS thiếu dữ liệu trong X phút; quãng đường hiển thị chỉ là phần đã đo được.” (X = unknown minutes, ≥ 1).
+- LOW quality copy (docs/06 §4, revised 2026-11-12 — maintainer chose option A): “Có X phút không xác định được đang đi hay dừng (mất GPS hoặc GPS chưa đủ chính xác); quãng đường hiển thị chỉ là phần đã đo được.” (X = all UNKNOWN minutes; “dưới 1” below a minute).
 - Components read/write only through `TripRepository` hooks; no Dexie in components; Zustand never holds points.
 - Rename/delete only for `COMPLETED` trips; an active/unfinished trip is resolved via the recovery notice (BR-01).
 - Delete = one transaction over trip + points + events (exists: `deleteTripCascade`) behind a confirm dialog (FR-14).

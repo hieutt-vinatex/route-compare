@@ -54,9 +54,12 @@ export const COPY = {
     'Chỉ tính các đoạn GPS liên tục đã đo được; không nối đường thẳng qua khoảng mất tín hiệu.',
 } as const;
 
-/** docs/06 §4 warning for a LOW-quality trip; X = minutes without measurement. */
+/**
+ * docs/06 §4 warning for a LOW-quality trip. X = all UNKNOWN time (no GPS, or GPS too weak to
+ * tell moving from stopped) — the time that lowers coverage and so the quality label.
+ */
 export function lowGpsCopy(unknownMs: number): string {
   const minutes = Math.round(unknownMs / 60_000);
   const span = minutes < 1 ? 'dưới 1' : String(minutes);
-  return `GPS thiếu dữ liệu trong ${span} phút; quãng đường hiển thị chỉ là phần đã đo được.`;
+  return `Có ${span} phút không xác định được đang đi hay dừng (mất GPS hoặc GPS chưa đủ chính xác); quãng đường hiển thị chỉ là phần đã đo được.`;
 }

@@ -79,12 +79,12 @@ describe('Trip Detail from one analysis (FR-10, RT-302, RT-304)', () => {
     expect(distance).not.toHaveTextContent('999');
   });
 
-  it('a LOW trip states how many minutes lack GPS (docs/06 §4) and lists the reasons', async () => {
+  it('a LOW trip states how many minutes are unknown (docs/06 §4) and lists the reasons', async () => {
     await seedCompleted(withGap(), 240_000);
     renderApp('/trips/d1', services);
     expect(
       await screen.findByText(
-        'GPS thiếu dữ liệu trong 3 phút; quãng đường hiển thị chỉ là phần đã đo được.',
+        'Có 3 phút không xác định được đang đi hay dừng (mất GPS hoặc GPS chưa đủ chính xác); quãng đường hiển thị chỉ là phần đã đo được.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByTestId('detail-quality')).toHaveTextContent('Thấp');
