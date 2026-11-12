@@ -94,8 +94,8 @@ function edgeKmh(edge: ClassifiedEdge): number | null {
 
 /**
  * Equal-time buckets → mean speed per bucket; every run of nulls stays one break.
- * shortcut: each break costs up to 2 extra points, so a trip with hundreds of gaps can exceed
- * maxPoints (e.g. 1 000 points for a gap every 10 s); Chart.js copes — cap breaks if it ever lags.
+ * maxPoints budgets the speeds; each break may add 2 points on top. A hard cap would have to merge
+ * values across gaps and draw lines over unmeasured time (BR-04), so very gappy trips draw more.
  */
 function bucket(raw: readonly RawPoint[], maxPoints: number): RawPoint[] {
   const first = raw[0];

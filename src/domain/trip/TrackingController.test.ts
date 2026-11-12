@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createControllerHarness, type ControllerHarness } from '@/tests/harness';
 import { lastOf, ORIGIN, straightLine, T0 } from '@/tests/fixtures/gpsFixtures';
 import { haversineM } from '../geo/haversine';
@@ -198,6 +198,67 @@ describe('recovery after a reload (FR-12, UC-08, BROWSER_RELOAD)', () => {
     expect(reloaded.lock.held).toBe(false);
     const active = await h.repo.listActiveTrips();
     expect(active.map((t) => t.id)).toEqual([before.tripId]);
+  });
+
+  it('a double tap on “end” runs the recovery once (M2 minor M4)', async () => {
+    const { before, reloaded } = await recordThenReload();
+    const id = before.tripId ?? '';
+    const results = await Promise.all([
+      reloaded.controller.endRecovered(id),
+      reloaded.controller.endRecovered(id),
+    ]);
+    expect(results.filter((r) => r === id)).toHaveLength(1);
+    expect((await h.repo.listEvents(id)).filter((e) => e.type === 'END')).toHaveLength(1);
+  });
+
+  it('a failed read while resuming releases the recorder lock and says so (M2 minor M4)', async () => {
+    const { before, reloaded } = await recordThenReload();
+    vi.spyOn(h.repo, 'getTrip').mockRejectedValueOnce(new Error('read failed'));
+    await reloaded.controller.resumeRecovered(before.tripId ?? '').catch(() => undefined);
+    expect(reloaded.lock.held).toBe(false);
+    expect(reloaded.controller.getSnapshot().status).toBe('IDLE');
+    expect(reloaded.controller.getSnapshot().storageError).toBe(true);
+  });
+
+  it('retrying “end” after a failed save writes RECOVERY and END once (M2 minor M13)', async () => {
+    const { before, reloaded } = await recordThenReload();
+    const id = before.tripId ?? '';
+    h.repo.failUpdateTrip = true;
+    await expect(reloaded.controller.endRecovered(id)).rejects.toThrow();
+    h.repo.failUpdateTrip = false;
+    expect(await reloaded.controller.endRecovered(id)).toBe(id);
+    const events = await h.repo.listEvents(id);
+    expect(events.filter((e) => e.type === 'END')).toHaveLength(1);
+    expect(
+      events.filter((e) => e.type === 'RECOVERY' && e.metadata?.reason === 'END_AFTER_RELOAD'),
+    ).toHaveLength(1);
+  });
+
+  it('reports the start fix found in the raw data when the stored row lacks it (M2 minor M7)', async () => {
+    await startTrip();
+    await h.emitAll(straightLine({ count: 5, startT: 1_000, speedMps: 5 }));
+    const id = h.controller.getSnapshot().tripId ?? '';
+    const stored = await h.repo.getTrip(id);
+    if (stored === undefined) throw new Error('trip missing');
+    // e.g. the row update with the start fix failed, or the tab died right after the first fix
+    await h.repo.updateTrip({ ...stored, startLat: null, startLng: null });
+    h.clock.set(T0 + 100_000);
+    const reloaded = createControllerHarness(undefined, { repo: h.repo, clock: h.clock });
+    const found = await reloaded.controller.findRecoverable();
+    expect(found?.startLat).not.toBeNull();
+  });
+
+  it('a recovered trip still waiting for GPS does not show the start timeout at once (M2 minor M14)', async () => {
+    await startTrip({ calibrate: false });
+    h.clock.set(T0 + 600_000);
+    const reloaded = createControllerHarness(undefined, { repo: h.repo, clock: h.clock });
+    const trip = await reloaded.controller.findRecoverable();
+    await reloaded.controller.resumeRecovered(trip?.id ?? '');
+    expect(reloaded.controller.getSnapshot().status).toBe('STARTING');
+    expect(reloaded.controller.getSnapshot().startWaitExceeded).toBe(false);
+    h.clock.set(T0 + 600_000 + reloaded.config.startFixTimeoutMs + 1_000);
+    reloaded.timers.tick();
+    expect(reloaded.controller.getSnapshot().startWaitExceeded).toBe(true);
   });
 
   it('finds the unfinished trip, unless another tab is recording it', async () => {
@@ -793,7 +854,24 @@ describe('End / FINALIZING (FR-05, UC-04)', () => {
     expect(id).toBe(tripId);
     const types = (await h.repo.listEvents(tripId)).map((e) => e.type);
     expect(types.filter((t) => t === 'END')).toHaveLength(1);
-    expect((await h.repo.getTrip(tripId))?.isIncomplete).toBe(true);
+    // Nothing recorded was lost: a save that only had to be retried does not mark the trip
+    // incomplete or log a storage error (M2 minor M2).
+    expect((await h.repo.getTrip(tripId))?.isIncomplete).toBe(false);
+    expect(types).not.toContain('STORAGE_ERROR');
+  });
+
+  it('END is written on retry when its first write failed (M2 minor M3)', async () => {
+    await startTrip();
+    await h.emitAll(straightLine({ count: 3, startT: 1_000 }));
+    h.repo.failEvents = true;
+    h.clock.set(T0 + 4_000);
+    expect(await h.controller.end()).toBeNull();
+    expect(h.controller.getSnapshot().interruptReason).toBe('FINALIZE_FAILED');
+    h.repo.failEvents = false;
+    const tripId = h.controller.getSnapshot().tripId ?? '';
+    expect(await h.controller.end()).toBe(tripId);
+    const types = (await h.repo.listEvents(tripId)).map((e) => e.type);
+    expect(types.filter((t) => t === 'END')).toHaveLength(1);
   });
 
   it('End is not allowed while STARTING (no COMPLETED trip without a start fix)', async () => {

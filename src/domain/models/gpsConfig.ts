@@ -52,6 +52,8 @@ export interface GpsConfig {
   readonly speedSmoothingWindow: number;
   /** §7 — centred median window (full windows only) for max/min/p95 speed statistics. */
   readonly speedStatsWindow: number;
+  /** §7 — moving edges needed before max/min/p95 are reported ("chỉ report khi sample count đủ"). */
+  readonly minSpeedStatEdges: number;
   /** Live “current speed” needs this many edges in the open segment… */
   readonly liveSpeedMinEdges: number;
   /** …and the last accepted fix must be at most this old. */
@@ -74,6 +76,8 @@ export interface GpsConfig {
     readonly goodMedianAccuracyM: number;
     readonly goodMaxLargeGaps: number;
     readonly fairCoveragePct: number;
+    /** Fewer accepted fixes than this is always LOW ("dữ liệu quá ít"). */
+    readonly minAcceptedFixes: number;
   };
   /** §9 route grouping radius (M4). */
   readonly routeGroupRadiusM: number;
@@ -91,6 +95,7 @@ export const DEFAULT_GPS_CONFIG: GpsConfig = {
   stop: { speedKmh: 2, dwellMs: 15_000, radiusM: 20 },
   speedSmoothingWindow: 3,
   speedStatsWindow: 5,
+  minSpeedStatEdges: 3,
   liveSpeedMinEdges: 2,
   liveSpeedMaxAgeMs: 10_000,
   liveSpeedWindowMs: 5_000,
@@ -104,6 +109,7 @@ export const DEFAULT_GPS_CONFIG: GpsConfig = {
     goodMedianAccuracyM: 25,
     goodMaxLargeGaps: 2,
     fairCoveragePct: 70,
+    minAcceptedFixes: 10,
   },
   routeGroupRadiusM: 150,
 };

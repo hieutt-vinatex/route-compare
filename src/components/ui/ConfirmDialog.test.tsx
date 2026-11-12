@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -28,5 +29,31 @@ describe('ConfirmDialog (NFR-13, review I4)', () => {
     rerender(renderDialog());
     rerender(renderDialog());
     expect(confirm).toHaveFocus();
+  });
+});
+
+describe('ConfirmDialog keyboard focus (NFR-13)', () => {
+  it('keeps Tab and Shift+Tab inside the open dialog', async () => {
+    render(
+      <>
+        <button type="button">Trên trang</button>
+        <ConfirmDialog
+          open
+          title="Đổi tên"
+          confirmLabel="Lưu"
+          onConfirm={() => undefined}
+          onCancel={() => undefined}
+        >
+          <input aria-label="Tên" />
+        </ConfirmDialog>
+      </>,
+    );
+    const input = screen.getByLabelText('Tên');
+    const save = screen.getByRole('button', { name: 'Lưu' });
+    save.focus();
+    await userEvent.tab();
+    expect(input).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    expect(save).toHaveFocus();
   });
 });

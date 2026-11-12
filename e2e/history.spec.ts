@@ -62,6 +62,22 @@ async function expectNoHorizontalScroll(page: Page): Promise<void> {
   ).toBeLessThanOrEqual(0);
 }
 
+test('Chart.js stays out of the main bundle (loaded only with the trip chart, ADR-09)', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/');
+  const main = await page.locator('script[type="module"]').first().getAttribute('src');
+  expect(main).toMatch(/\/assets\/index-.*\.js$/);
+  // A message only Chart.js contains; the check is meaningful only if the chart chunk has it.
+  const marker = 'Canvas is already in use';
+  const mainCode = await (await request.get(main ?? '')).text();
+  expect(mainCode).not.toContain(marker);
+  const chunk = /SpeedChart-[\w-]+\.js/.exec(mainCode)?.[0];
+  expect(chunk).toBeDefined();
+  expect(await (await request.get(`/assets/${chunk ?? ''}`)).text()).toContain(marker);
+});
+
 test.describe('M3 history and trip detail (simulated GPS)', () => {
   test('detail chart and formulas, then search and filter two trips — under the production CSP', async ({
     page,

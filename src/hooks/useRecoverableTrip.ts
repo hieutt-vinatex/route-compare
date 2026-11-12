@@ -12,7 +12,7 @@ export interface RecoverableTrip {
 }
 
 export function useRecoverableTrip(): RecoverableTrip {
-  const { tracker, lock } = useServices();
+  const { tracker, lock, visibility } = useServices();
   const { status } = useTracking();
   const [found, setFound] = useState<Trip | null>(null);
   const [version, setVersion] = useState(0);
@@ -27,11 +27,16 @@ export function useRecoverableTrip(): RecoverableTrip {
     };
     look();
     const unsubscribe = lock.onChange(look);
+    // A recording tab that crashed or was killed releases its lock without any broadcast.
+    const unsubscribeVisible = visibility.subscribe((visible) => {
+      if (visible) look();
+    });
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeVisible();
     };
-  }, [tracker, lock, status, version]);
+  }, [tracker, lock, visibility, status, version]);
 
   const refresh = useCallback(() => {
     setVersion((v) => v + 1);

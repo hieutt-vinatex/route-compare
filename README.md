@@ -100,7 +100,7 @@ Luồng một mẫu GPS: `watchPosition` → chuẩn hóa đơn vị → **hàng
 - Trên trình duyệt không có Web Locks (iOS < 15.4) khóa một-tab dùng lease 15 s; tab bị ẩn lâu có thể mất quyền ghi cho tab khác và sẽ tự dừng ghi khi phát hiện.
 - So sánh, nhóm A→B và Xuất/Nhập dữ liệu (M4) chưa làm; chưa lọc theo tuyến (route group, M4).
 - Danh sách Lịch sử không phân trang (phù hợp vài trăm chuyến). Biểu đồ gộp theo thời gian còn ~600 điểm, cộng tối đa 2 điểm cho mỗi khoảng ngắt (chuyến có hàng trăm khoảng mất GPS có thể vẽ nhiều điểm hơn).
-- Hộp thoại xác nhận chưa giữ focus bên trong khi bấm Tab (trả focus về nút đã mở thì đã có).
+- Thời gian dùng đồng hồ hệ thống: nếu đổi giờ thiết bị **trong lúc** đang ghi, tổng thời gian chuyến đó có thể sai. Không dùng đồng hồ đơn điệu (`performance.now()`) vì trên iOS/macOS nó ngừng chạy khi máy ngủ — thời gian khóa màn hình sẽ biến mất khỏi chuyến.
 - Số liệu ở Lịch sử là bản tóm tắt lưu lúc Kết thúc; trang Chi tiết tính lại từ dữ liệu gốc — trùng nhau khi thuật toán/ngưỡng chưa đổi.
 - IndexedDB có thể bị trình duyệt xóa (xóa dữ liệu site, chế độ riêng tư); sao lưu JSON đến ở M4.
 

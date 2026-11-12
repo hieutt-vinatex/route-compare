@@ -354,6 +354,21 @@ describe('Recovery after reload (FR-12, UC-08)', () => {
     expect(screen.getByRole('button', { name: 'Bắt đầu ghi hành trình' })).toBeEnabled();
   });
 
+  it('notices a trip left by a crashed tab when this page becomes visible again (M2 minor M6)', async () => {
+    await leftover({ startLat: ORIGIN.lat, startLng: ORIGIN.lng });
+    services.mockLock.heldByOtherTab = true;
+    renderApp('/', services);
+    await screen.findByText(/GPS:/);
+    expect(screen.queryByTestId('recovery-notice')).not.toBeInTheDocument();
+    // The recording tab crashed: its lock vanished without any broadcast.
+    services.mockLock.heldByOtherTab = false;
+    act(() => {
+      services.mockVisibility.setVisible(false);
+      services.mockVisibility.setVisible(true);
+    });
+    expect(await screen.findByTestId('recovery-notice')).toBeInTheDocument();
+  });
+
   it('is not offered while another tab is recording', async () => {
     await leftover({ startLat: ORIGIN.lat, startLng: ORIGIN.lng });
     services.mockLock.heldByOtherTab = true;

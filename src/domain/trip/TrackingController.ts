@@ -34,6 +34,7 @@ import type {
   RawGpsSample,
   TransportMode,
   Trip,
+  TripEvent,
   TripEventType,
   TripStatus,
 } from '../models/types';
@@ -184,6 +185,12 @@ export class TrackingController {
   private wakeWanted = false;
   private wakeFailed = false;
   private endEventsWritten = false;
+  /** The open-gap marker at End is written once, even when the save is retried. */
+  private endGapWritten = false;
+  /** When this tab began waiting for the first fix (Start, or resume after a reload). */
+  private startWaitFrom: number | null = null;
+  /** The recovery command in flight: a double tap must not resume/end/discard twice. */
+  private recoveryTask: Promise<unknown> | null = null;
   /** First End press; kept across finalize retries so elapsed time does not grow. */
   private endedAt: number | null = null;
   private lastCheckpointAt = 0;
@@ -257,6 +264,7 @@ export class TrackingController {
       transportMode: input.transportMode,
     });
     this.acquiringSince = now;
+    this.startWaitFrom = now;
     this.transition('START');
     this.publish();
 
@@ -344,9 +352,9 @@ export class TrackingController {
       final = await this.withTimeout(saving, config.finalizeTimeoutMs);
     } catch {
       // FINALIZING failed: keep everything, let the user retry. Never delete the track.
-      this.storageError = true;
+      // Nothing recorded was lost, so the trip is not marked incomplete for it (M2 minor M2);
+      // the UI shows its own "finalize failed" notice.
       this.interruptReason = 'FINALIZE_FAILED';
-      this.hadInterruption = true;
       this.transition('FINALIZE_FAILED');
       this.publish();
       // A save that only timed out may still commit: adopt it instead of losing it (review I1).
@@ -392,15 +400,51 @@ export class TrackingController {
     if (this.status !== 'IDLE') return null;
     if (await this.deps.lock.heldElsewhere()) return null;
     const trips = await this.deps.repository.listActiveTrips();
-    return [...trips].sort((a, b) => b.startedAt - a.startedAt)[0] ?? null;
+    const trip = [...trips].sort((a, b) => b.startedAt - a.startedAt)[0];
+    if (trip === undefined || trip.startLat !== null) return trip ?? null;
+    // The row can miss its start fix (that update failed, or the tab died right after the first
+    // fix): offer what the raw data allows -- End, not discard (M2 minor M7).
+    const loaded = await this.loadUnfinished(trip.id);
+    const first =
+      loaded === null
+        ? null
+        : replayTrack({ ...loaded, config: this.deps.config }).state.firstAccepted;
+    return first === null ? trip : { ...trip, startLat: first.lat, startLng: first.lng };
+  }
+
+  /** One recovery command at a time (M2 minor M4). */
+  private oneRecovery<T>(idle: T, work: () => Promise<T>): Promise<T> {
+    if (this.status !== 'IDLE' || this.recoveryTask !== null) return Promise.resolve(idle);
+    const task = work().finally(() => {
+      this.recoveryTask = null;
+    });
+    this.recoveryTask = task;
+    return task;
+  }
+
+  /** An unfinished trip with its raw data, or null when it is gone or already finished. */
+  private async loadUnfinished(
+    id: string,
+  ): Promise<{ trip: Trip; points: GpsPoint[]; events: TripEvent[] } | null> {
+    const { repository } = this.deps;
+    const trip = await repository.getTrip(id);
+    if (trip === undefined || trip.status === 'COMPLETED') return null;
+    const [points, events] = await Promise.all([
+      repository.listPoints(id),
+      repository.listEvents(id),
+    ]);
+    return { trip, points, events };
   }
 
   /**
    * Continue an unfinished trip after a reload. Nothing is reconstructed for the time the page
    * was closed: the persisted data is replayed, then recording resumes in a NEW segment.
    */
-  async resumeRecovered(id: string): Promise<void> {
-    if (this.status !== 'IDLE') return;
+  resumeRecovered(id: string): Promise<void> {
+    return this.oneRecovery(undefined, () => this.runResumeRecovered(id));
+  }
+
+  private async runResumeRecovered(id: string): Promise<void> {
     const { repository, config, clock, lock } = this.deps;
     this.resetSession();
     if (!(await lock.acquire())) {
@@ -408,15 +452,19 @@ export class TrackingController {
       this.publish();
       return;
     }
-    const trip = await repository.getTrip(id);
-    if (trip === undefined || trip.status === 'COMPLETED') {
+    let loaded: { trip: Trip; points: GpsPoint[]; events: TripEvent[] } | null;
+    try {
+      loaded = await this.loadUnfinished(id);
+    } catch {
+      loaded = null;
+      this.storageError = true; // never keep the recorder lock after a failed read (M4)
+    }
+    if (loaded === null) {
       await lock.release();
+      this.publish();
       return;
     }
-    const [points, events] = await Promise.all([
-      repository.listPoints(id),
-      repository.listEvents(id),
-    ]);
+    const { trip, points, events } = loaded;
     const replay = replayTrack({ trip, points, events, config });
     const at = clock.now();
     const command: TripCommand =
@@ -437,6 +485,7 @@ export class TrackingController {
     this.lastCheckpointAt = at;
     this.lastResumeAt = at;
     this.acquiringSince = at;
+    this.startWaitFrom = at;
     this.transition(command);
 
     const seq = this.nextSeq();
@@ -462,8 +511,11 @@ export class TrackingController {
    * activity (R1) — never the moment the app was reopened. Returns null when nothing was measured
    * (such a trip can only be discarded, D3) or when another tab holds the recorder.
    */
-  async endRecovered(id: string): Promise<string | null> {
-    if (this.status !== 'IDLE') return null;
+  endRecovered(id: string): Promise<string | null> {
+    return this.oneRecovery(null, () => this.runEndRecovered(id));
+  }
+
+  private async runEndRecovered(id: string): Promise<string | null> {
     const { repository, config, clock, lock, ids } = this.deps;
     if (!(await lock.acquire())) {
       this.recorderBusy = true;
@@ -471,22 +523,26 @@ export class TrackingController {
       return null;
     }
     try {
-      const trip = await repository.getTrip(id);
-      if (trip === undefined || trip.status === 'COMPLETED') return null;
-      const [points, events] = await Promise.all([
-        repository.listPoints(id),
-        repository.listEvents(id),
-      ]);
+      const loaded = await this.loadUnfinished(id);
+      if (loaded === null) return null;
+      const { trip, points, events } = loaded;
       // End already pressed (save failed/interrupted): that moment is the end, not later activity.
       const endedAt =
         events.findLast((e) => e.type === 'END')?.timestamp ?? lastActivityAt(trip, points, events);
       const metrics = analyzeTrip({ trip, points, events, endedAt, config });
       if (metrics.start === null) return null;
       let seq = maxSequence(points, events);
+      // A retry after a failed save must not write these twice (M2 minor M13).
+      const written = (type: TripEventType): boolean =>
+        events.some(
+          (e) =>
+            e.type === type && (type !== 'RECOVERY' || e.metadata?.reason === 'END_AFTER_RELOAD'),
+        );
       for (const [type, metadata] of [
         ['RECOVERY', { reason: 'END_AFTER_RELOAD', decidedAt: clock.now() }],
         ['END', null],
       ] as const) {
+        if (written(type)) continue;
         seq += 1;
         await repository.appendEvent({
           id: ids.next(),
@@ -509,18 +565,17 @@ export class TrackingController {
   }
 
   /** Delete an unfinished trip that never got a valid start fix (D3). Anything else is kept. */
-  async discardRecovered(id: string): Promise<void> {
-    if (this.status !== 'IDLE') return;
+  discardRecovered(id: string): Promise<void> {
+    return this.oneRecovery(undefined, () => this.runDiscardRecovered(id));
+  }
+
+  private async runDiscardRecovered(id: string): Promise<void> {
     const { repository, config, lock } = this.deps;
     if (!(await lock.acquire())) return;
     try {
-      const trip = await repository.getTrip(id);
-      if (trip === undefined || trip.status === 'COMPLETED') return;
-      const [points, events] = await Promise.all([
-        repository.listPoints(id),
-        repository.listEvents(id),
-      ]);
-      if (replayTrack({ trip, points, events, config }).state.firstAccepted !== null) return;
+      const loaded = await this.loadUnfinished(id);
+      if (loaded === null) return;
+      if (replayTrack({ ...loaded, config }).state.firstAccepted !== null) return;
       await repository.deleteTripCascade(id);
     } finally {
       await lock.release();
@@ -538,13 +593,18 @@ export class TrackingController {
     const lastFixFresh = hasFreshFix(this.proc, endedAt, config);
 
     await this.releaseWakeLockForEnd(endedAt);
-    if (!this.endEventsWritten) {
+    // Each End marker is written once and must succeed: a failed write fails this save, so the
+    // retry writes it (M2 minor M3) instead of finishing a trip without END.
+    if (!this.endGapWritten) {
       const gapFrom = endedWhilePaused ? null : this.unresolvedGapStart(lastFixFresh);
       if (gapFrom !== null) {
         // GPS was lost (or never came back after a boundary) before End: record the open gap.
-        await this.appendEvent('GPS_GAP_BEGIN', gapFrom, { unresolvedAtEnd: true });
+        await this.writeEvent('GPS_GAP_BEGIN', gapFrom, { unresolvedAtEnd: true });
       }
-      await this.appendEvent('END', endedAt, null);
+      this.endGapWritten = true;
+    }
+    if (!this.endEventsWritten) {
+      await this.writeEvent('END', endedAt, null);
       this.endEventsWritten = true;
     }
 
@@ -1053,21 +1113,31 @@ export class TrackingController {
     metadata: EventMetadata | null,
     seq: number = this.nextSeq(),
   ): Promise<void> {
-    const trip = this.trip;
-    if (trip === null) return;
     try {
-      await this.deps.repository.appendEvent({
-        id: this.deps.ids.next(),
-        tripId: trip.id,
-        seq,
-        timestamp,
-        type,
-        metadata,
-      });
+      await this.writeEvent(type, timestamp, metadata, seq);
     } catch {
       this.storageError = true;
       this.publish();
     }
+  }
+
+  /** Persist an event; rejects when the write fails (callers that must retry it). */
+  private async writeEvent(
+    type: TripEventType,
+    timestamp: number,
+    metadata: EventMetadata | null,
+    seq: number = this.nextSeq(),
+  ): Promise<void> {
+    const trip = this.trip;
+    if (trip === null) return;
+    await this.deps.repository.appendEvent({
+      id: this.deps.ids.next(),
+      tripId: trip.id,
+      seq,
+      timestamp,
+      type,
+      metadata,
+    });
   }
 
   private async onStorageFailure(operation: string): Promise<void> {
@@ -1134,6 +1204,8 @@ export class TrackingController {
     this.recorderBusy = false;
     this.wakeFailed = false;
     this.endEventsWritten = false;
+    this.endGapWritten = false;
+    this.startWaitFrom = null;
     this.endedAt = null;
     this.lastCheckpointAt = 0;
   }
@@ -1252,7 +1324,8 @@ export class TrackingController {
       startWaitExceeded:
         this.status === 'STARTING' &&
         trip !== null &&
-        now - trip.startedAt > config.startFixTimeoutMs,
+        // From when this tab began waiting, not the original start of a recovered trip (M14).
+        now - (this.startWaitFrom ?? trip.startedAt) > config.startFixTimeoutMs,
       gpsError: this.gpsError,
       interruptReason: this.interruptReason,
       storageError: this.storageError,

@@ -18,7 +18,7 @@
 - Components read/write only through `TripRepository` hooks; no Dexie in components; Zustand never holds points.
 - Rename/delete only for `COMPLETED` trips; an active/unfinished trip is resolved via the recovery notice (BR-01).
 - Delete = one transaction over trip + points + events (exists: `deleteTripCascade`) behind a confirm dialog (FR-14).
-- Chart: UNKNOWN intervals are shaded and plotted as line breaks (`null`), never as 0; ≤ 600 plotted points.
+- Chart: UNKNOWN intervals are shaded and plotted as line breaks (`null`), never as 0; ≈ 600 plotted speeds, plus up to 2 points per gap (a hard cap would bridge gaps — ruled in the final review).
 - Mobile 360/390 px without horizontal scroll; buttons ≥ 44 px; colour never the only signal.
 - Production CSP stays strict (no `unsafe-inline`); E2E asserts zero CSP violations on Detail with the chart.
 

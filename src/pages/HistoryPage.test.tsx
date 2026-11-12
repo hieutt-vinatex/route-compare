@@ -108,3 +108,16 @@ describe('History search and filters (FR-09, RT-301)', () => {
     expect(rows()[0]).toHaveTextContent('GPS: Thấp');
   });
 });
+
+describe('History with an unfinished trip (review focus 1)', () => {
+  it('keeps the recovery notice visible when the filters hide the unfinished row', async () => {
+    await seed('a', 'Đang dở', { status: 'RECORDING' });
+    await seed('b', 'Đã xong', { startedAt: T0 + 1_000 });
+    renderApp('/history?status=COMPLETE', services);
+    expect(await screen.findByTestId('recovery-notice')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(rows()).toHaveLength(1);
+    });
+    expect(rows()[0]).toHaveTextContent('Đã xong');
+  });
+});

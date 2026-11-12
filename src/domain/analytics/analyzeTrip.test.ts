@@ -290,6 +290,19 @@ describe('coverage and quality (§8)', () => {
     expect(m.coveragePct).toBeNull();
   });
 
+  it('the data minimums for quality and speed statistics come from GpsConfig (M2 minor M11)', () => {
+    const { trip, points, events } = persisted(samples(straightLine({ count: 8, speedMps: 5 })));
+    const input = { trip, points, events, endedAt: T0 + 7_500 };
+    expect(analyzeTrip({ ...input, config: cfg }).qualityLabel).toBe('LOW'); // < 10 fixes
+    const lenient = { ...cfg, quality: { ...cfg.quality, minAcceptedFixes: 5 } };
+    expect(analyzeTrip({ ...input, config: lenient }).qualityLabel).not.toBe('LOW');
+    const long = persisted(samples(straightLine({ count: 40, speedMps: 5 })));
+    const longInput = { ...long, endedAt: T0 + 39_500 };
+    expect(analyzeTrip({ ...longInput, config: cfg }).maxSpeedKmh).not.toBeNull();
+    const strict = { ...cfg, minSpeedStatEdges: 100 };
+    expect(analyzeTrip({ ...longInput, config: strict }).maxSpeedKmh).toBeNull();
+  });
+
   it('too little data is LOW whatever the coverage', () => {
     const m = analyze(samples(straightLine({ count: 4, speedMps: 5 })), 3_300);
     expect(m.qualityLabel).toBe('LOW');

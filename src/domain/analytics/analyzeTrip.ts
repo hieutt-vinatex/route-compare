@@ -56,11 +56,6 @@ export interface AnalyzeTripInput {
   readonly config: GpsConfig;
 }
 
-/** Minimum accepted fixes before a quality label above LOW is possible (“dữ liệu quá ít”). */
-const MIN_FIXES_FOR_QUALITY = 10;
-/** Edges needed before reporting max/min/p95 speeds (§7: “chỉ report khi sample count đủ”). */
-const MIN_EDGES_FOR_SPEED_STATS = 3;
-
 export function analyzeTrip(input: AnalyzeTripInput): TripMetrics {
   const { trip, points, events, endedAt, config } = input;
   const start = trip.startedAt;
@@ -108,7 +103,7 @@ export function analyzeTrip(input: AnalyzeTripInput): TripMetrics {
     .filter((e) => e.cls === 'MOVING' && e.statSpeedMps !== null)
     .map((e) => e.statSpeedMps ?? 0)
     .sort((a, b) => a - b);
-  const enough = movingSpeeds.length >= MIN_EDGES_FOR_SPEED_STATS;
+  const enough = movingSpeeds.length >= config.minSpeedStatEdges;
   const positive = movingSpeeds.filter((v) => v > 0);
 
   return {
@@ -160,7 +155,7 @@ function quality(
   config: GpsConfig,
 ): QualityLabel {
   const q = config.quality;
-  if (coveragePct === null || acceptedFixes < MIN_FIXES_FOR_QUALITY) return 'LOW';
+  if (coveragePct === null || acceptedFixes < q.minAcceptedFixes) return 'LOW';
   if (
     coveragePct >= q.goodCoveragePct &&
     medianAccuracyM !== null &&

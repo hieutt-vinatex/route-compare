@@ -69,6 +69,22 @@ export function ConfirmDialog({
         aria-labelledby={titleId}
         aria-describedby={description === undefined ? undefined : descId}
         className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        onKeyDown={(e) => {
+          if (e.key !== 'Tab') return;
+          // aria-modal: keyboard focus must not wander to the page behind the overlay.
+          const focusable = e.currentTarget.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]',
+          );
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last?.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first?.focus();
+          }
+        }}
       >
         <h2 id={titleId} className="text-lg font-bold text-slate-900">
           {title}
