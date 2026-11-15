@@ -882,6 +882,14 @@ describe('End / FINALIZING (FR-05, UC-04)', () => {
 });
 
 describe('Wake Lock (FR-16, AC-10)', () => {
+  it('is already held when Start returns, so a screen lock cannot cut the first fixes', async () => {
+    // The app wants it from the outset (default on); the harness opts out, so ask explicitly.
+    await h.controller.setKeepScreenOn(true);
+    await startTrip();
+    expect(h.wakeLock.isActive()).toBe(true);
+    expect(await eventTypes()).toContain('WAKELOCK_ACQUIRED');
+  });
+
   it('acquires on request, logs release by the system, re-acquires when visible, releases on End', async () => {
     await startTrip();
     await h.emit({ t: 1_000, lat: ORIGIN.lat, lng: ORIGIN.lng });

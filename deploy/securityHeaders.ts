@@ -64,6 +64,12 @@ export function cloudflareHeadersFile(tileUrl: string): string {
   for (const [name, value] of Object.entries(securityHeaders(tileUrl))) {
     lines.push(`  ${name}: ${value}`);
   }
-  lines.push('', '/assets/*', '  Cache-Control: public, max-age=31536000, immutable', '');
+  lines.push('', '/assets/*', '  Cache-Control: public, max-age=31536000, immutable');
+  // Hashed assets may be cached forever; these three are fetched by a FIXED url, so a cached copy
+  // would pin users to an old release — a stale service worker keeps serving the old app shell.
+  for (const path of ['/sw.js', '/registerSW.js', '/manifest.webmanifest']) {
+    lines.push('', path, '  Cache-Control: no-cache');
+  }
+  lines.push('');
   return lines.join('\n');
 }

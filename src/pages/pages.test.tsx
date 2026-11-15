@@ -179,7 +179,13 @@ describe('Tracking flow (AC-01, AC-03, AC-04)', () => {
     expect(screen.getByTestId('detail-quality')).toHaveTextContent(/GOOD|FAIR|LOW|Tốt|Khá|Thấp/);
     expect(screen.getByText('Đi bộ', { exact: false })).toBeInTheDocument();
     const events = within(screen.getByTestId('trip-events')).getAllByRole('listitem');
-    expect(events.map((li) => li.dataset.eventType)).toEqual(['START', 'END']);
+    // The screen is kept on by default, so the trip also logs the wake-lock pair.
+    expect(events.map((li) => li.dataset.eventType)).toEqual([
+      'START',
+      'WAKELOCK_ACQUIRED',
+      'WAKELOCK_RELEASED',
+      'END',
+    ]);
   });
 
   it('Tạm dừng / Tiếp tục switch the recording state', async () => {
@@ -389,14 +395,18 @@ describe('Wake Lock toggle (FR-16, AC-10)', () => {
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
   });
 
-  it('turns on, and reports a refusal without blocking tracking', async () => {
+  it('is on by default, reports a refusal without blocking tracking, and can be turned off', async () => {
     services.mockWakeLock.denyRequests = true;
     await services.tracker.start({ name: 'T', transportMode: 'CAR' });
     renderApp('/tracking', services);
     const toggle = await screen.findByRole('switch', { name: 'Giữ màn hình sáng' });
-    await userEvent.click(toggle);
+    expect(toggle).toBeChecked();
     expect(await screen.findByTestId('wakelock-failed')).toHaveTextContent(COPY.wakeLockFailed);
     expect(services.tracker.getSnapshot().status).toBe('STARTING');
+
+    await userEvent.click(toggle);
+    expect(toggle).not.toBeChecked();
+    expect(screen.queryByTestId('wakelock-failed')).not.toBeInTheDocument();
   });
 });
 
@@ -406,11 +416,11 @@ describe('Routes & layout (RT-002)', () => {
     expect(await screen.findByText('Chưa có hành trình đang ghi')).toBeInTheDocument();
   });
 
-  it('renders history empty state, compare placeholder and 404', async () => {
+  it('renders history empty state, compare empty state and 404', async () => {
     const { router } = renderApp('/history', services);
     expect(await screen.findByText(COPY.noTrips)).toBeInTheDocument();
     await act(() => router.navigate('/compare'));
-    expect(await screen.findByText('Tính năng so sánh đang được phát triển')).toBeInTheDocument();
+    expect(await screen.findByText('Chưa có nhóm hành trình nào để so sánh')).toBeInTheDocument();
     await act(() => router.navigate('/khong-ton-tai'));
     expect(await screen.findByText('Không tìm thấy trang')).toBeInTheDocument();
     await act(() => router.navigate('/trips/unknown'));

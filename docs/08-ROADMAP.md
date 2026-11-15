@@ -45,17 +45,17 @@
 
 ## M4 — So sánh và xuất dữ liệu
 
-- RT-401: Group matching same direction within 150m, mode filter, manual route variant.
-- RT-402: Comparison overlay map and table; warnings on LOW coverage/non-comparable mode.
-- RT-403: Median/P90 only with sufficient repeated samples (P1).
-- RT-404: Export/Import JSON schema version, CSV/GPX segments.
+- RT-401: Group matching same direction within 150m, mode filter, manual route variant. **Xong (15/11/2026)**: `src/domain/compare/grouping.ts` — ghép theo cả hai đầu ≤ `routeGroupRadiusM`, cùng mode; chiều ngược là nhóm riêng; chuyến thiếu điểm đầu/cuối bị loại.
+- RT-402: Comparison overlay map and table; warnings on LOW coverage/non-comparable mode. **Xong**: `ComparePage` + `src/domain/compare/compare.ts`; bản đồ chồng tuyến mỗi chuyến một màu (`TrackMapProps.segmentColors`).
+- RT-403: Median/P90 only with sufficient repeated samples (P1). **Xong**: `MIN_TRIPS_FOR_DISTRIBUTION = 3`, dưới mức này trả `null` và UI nói rõ là chưa đủ.
+- RT-404: Export/Import JSON schema version, CSV/GPX segments. **Nhập GPX đã hiện thực (14/11/2026)**: `src/adapters/import/gpx.ts` đọc tệp, `src/domain/import/importedTrip.ts` dựng Trip/GpsPoint/TripEvent và phân tích bằng `analyzeTrip` với `importConfig` (ngưỡng gap theo nhịp ghi của tệp). Mỗi `<trkseg>` → sự kiện RECOVERY, không nối quãng đường qua ranh giới. Trip mang `importedFrom: 'GPX'` và hiển thị nhãn riêng ở Lịch sử + Chi tiết. Phần **xuất** đã xong: `src/domain/export/serialize.ts` (GPX một `<trkseg>` mỗi đoạn đo được, CSV đủ mẫu RAW kèm `rejectCode`, JSON sao lưu có `schemaVersion`) và `parseBackup.ts` kiểm tra từng dòng trước khi ghi vào IndexedDB; khôi phục **không ghi đè** chuyến đã có.
 - RT-405: Delete cascade, backup reminder, optional trim start/end of exported track.
 
 ## M5 — Production readiness
 
-- RT-501: PWA manifest + SW only app-shell caching; do not prefetch OSM tiles.
+- RT-501: PWA manifest + SW only app-shell caching; do not prefetch OSM tiles. **Xong**: `deploy/pwa.ts` (+ test) — `globPatterns` chỉ app shell, **không** `runtimeCaching`, `injectRegister: 'script-defer'` để hợp CSP `script-src 'self'`.
 - RT-502: Accessibility/visual QA (360px to desktop), no in-motion interaction.
-- RT-503: Docs and privacy/limitations screens, source attributions.
+- RT-503: Docs and privacy/limitations screens, source attributions. **Xong**: route `/about` (`src/pages/AboutPage.tsx`), dùng lại `COPY.platformDetail`/`COPY.locationPrivacy` nên chỉ có một bản câu chữ.
 - RT-504: Cloudflare Pages deployment, HTTPS/SPA fallback; preview/prod deploy.
 - RT-505: Field testing + results (devices, browsers, GPS coverage, battery observations).
 

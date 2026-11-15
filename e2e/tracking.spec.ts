@@ -110,6 +110,9 @@ test.describe('live tracking with simulated GPS (AC-02, AC-03, AC-04, AC-10)', (
     await page.goto('/');
     await emit(page, ORIGIN);
     await page.getByRole('button', { name: 'Bắt đầu ghi hành trình' }).click();
+    // Wait for the watcher before emitting: fixes sent before it is registered are simply lost.
+    await expect(page.getByTestId('tracking-status')).toHaveText('Đang chờ GPS để bắt đầu');
+    expect(await page.evaluate(() => window.__rtMock.activeWatchers())).toBe(1);
     for (const p of eastLine(ORIGIN, 4, 5, 0)) await emit(page, p); // 1 calibration + 3
     await expect(page.getByTestId('tracking-status')).toHaveText('Đang ghi');
 

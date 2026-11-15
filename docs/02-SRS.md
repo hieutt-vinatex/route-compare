@@ -35,7 +35,7 @@
 
 | ID | Yêu cầu |
 |---|---|
-| FR-16 | Screen Wake Lock khi trang active, cho phép tắt, xử lý release/reacquire |
+| FR-16 | Screen Wake Lock khi trang active, **bật sẵn mặc định** (khóa màn hình làm trình duyệt ngừng trả GPS), cho phép tắt, xử lý release/reacquire |
 | FR-17 | Biểu đồ tốc độ theo thời gian, phân vùng unknown và các mốc dừng |
 | FR-18 | Nhóm A→B tự gợi ý trong bán kính cấu hình 150m + cùng hướng |
 | FR-19 | Đặt tên route variant thủ công (Đường A/Đường B) |

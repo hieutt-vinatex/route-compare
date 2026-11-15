@@ -9,6 +9,8 @@ export interface MapPosition extends LatLng {
 export interface TrackMapProps {
   /** One polyline per GPS segment; never joined across gaps. */
   readonly segments: readonly (readonly LatLng[])[];
+  /** Optional colour per segment (compare overlay); default track colour when absent. */
+  readonly segmentColors?: readonly string[];
   /** Changes whenever `segments` change (cheap redraw check). */
   readonly trackVersion?: number;
   readonly current?: MapPosition | null;

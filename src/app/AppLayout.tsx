@@ -96,6 +96,14 @@ export function AppLayout() {
         <main id="main" className={`flex-1 ${onTracking ? 'pb-4' : 'pb-20'} md:pb-6`}>
           <Outlet />
         </main>
+
+        {!onTracking && (
+          <footer className="px-4 pb-24 text-center text-sm text-slate-600 md:pb-6">
+            <Link to="/about" className="underline">
+              Giới thiệu, quyền riêng tư và giới hạn
+            </Link>
+          </footer>
+        )}
       </div>
 
       {!onTracking && (

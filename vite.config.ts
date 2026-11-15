@@ -2,7 +2,9 @@ import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { loadEnv, type Plugin } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
+import { PWA_OPTIONS } from './deploy/pwa.ts';
 import { cloudflareHeadersFile, securityHeaders } from './deploy/securityHeaders.ts';
 import { DEFAULT_TILE_URL } from './src/components/map/tileDefaults.ts';
 
@@ -30,7 +32,7 @@ export default defineConfig(({ mode }) => {
       : DEFAULT_TILE_URL;
 
   return {
-    plugins: [react(), tailwindcss(), cloudflareHeaders(tileUrl)],
+    plugins: [react(), tailwindcss(), VitePWA(PWA_OPTIONS), cloudflareHeaders(tileUrl)],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

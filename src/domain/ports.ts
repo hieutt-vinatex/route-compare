@@ -95,6 +95,12 @@ export interface TripRepository {
   /** Trips not yet COMPLETED (recording elsewhere, or left over after a reload/crash). */
   listActiveTrips(): Promise<Trip[]>;
   deleteTripCascade(id: string): Promise<void>;
+  /**
+   * Write a whole finished trip (imported from a file) in ONE transaction: either the trip, its
+   * points and its events are all stored, or nothing is — a half-imported trip would be read as
+   * a real measurement with missing data.
+   */
+  importTrip(trip: Trip, points: readonly GpsPoint[], events: readonly TripEvent[]): Promise<void>;
   appendRawPoint(point: GpsPoint): Promise<void>;
   recordProcessingResult(pointId: string, result: PointProcessingResult): Promise<void>;
   appendEvent(event: TripEvent): Promise<void>;

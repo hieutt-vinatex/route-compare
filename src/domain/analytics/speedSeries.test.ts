@@ -14,6 +14,7 @@ function run(fromS: number, count: number, cls: EdgeClass, speedMps: number | nu
     cls,
     speedMps,
     statSpeedMps: speedMps,
+    distanceM: speedMps === null ? 0 : speedMps,
   }));
 }
 

@@ -35,6 +35,8 @@ export interface ClassifiedEdge {
   readonly speedMps: number | null;
   /** Full-window median speed for statistics (max/min/p95), or null near segment ends. */
   readonly statSpeedMps: number | null;
+  /** Metres the drift filter counted on this edge (§3.7); 0 when the move stayed inside the error. */
+  readonly distanceM: number;
 }
 
 export function classifyEdges(fixes: readonly ReplayedFix[], config: GpsConfig): ClassifiedEdge[] {
@@ -56,9 +58,9 @@ function classifySegment(seg: readonly ReplayedFix[], config: GpsConfig): Classi
   const slowMps = config.stop.speedKmh / 3.6;
 
   // edgeSpeed[i] = evidence for the edge (i-1 → i); index 0 has no edge.
-  const chunk = chunkSpeeds(seg);
+  const chunk = chunkMetrics(seg);
   const edgeSpeed: (number | null)[] = seg.map((fix, i) =>
-    i === 0 ? null : (fix.speedMps ?? chunk[i] ?? null),
+    i === 0 ? null : (fix.speedMps ?? chunk.speed[i] ?? null),
   );
   const stopped = confirmedStopFixes(seg, config);
   const statBase: (number | null)[] = seg.map((fix, i) =>
@@ -84,25 +86,56 @@ function classifySegment(seg: readonly ReplayedFix[], config: GpsConfig): Classi
       const window = statBase.slice(i - half, i + half + 1);
       if (window.every((v) => v !== null)) statSpeedMps = median(definedOf(window));
     }
-    edges.push({ from: a.recordedAt, to: b.recordedAt, cls, speedMps: local, statSpeedMps });
+    edges.push({
+      from: a.recordedAt,
+      to: b.recordedAt,
+      cls,
+      speedMps: local,
+      statSpeedMps,
+      distanceM: chunk.distanceM[i] ?? 0,
+    });
   }
   return edges;
 }
 
-/** Speed of each drift-filter chunk, assigned to every edge inside it (null after the last anchor). */
-function chunkSpeeds(seg: readonly ReplayedFix[]): (number | null)[] {
-  const out: (number | null)[] = seg.map(() => null);
+/**
+ * Per-edge speed and distance of each drift-filter chunk (null/0 after the last anchor).
+ *
+ * The drift filter books the whole anchor→fix distance on the one fix where the step finally
+ * exceeds the position error, although the movement happened over every edge since the anchor.
+ * Leaving it there would make that single edge carry e.g. 35 m in 1 s (126 km/h) while its
+ * neighbours carry 0 — so any distance ÷ time taken over a subset of edges is nonsense. The
+ * distance is therefore spread over the chunk's edges in proportion to their duration, which is
+ * the same assumption the chunk speed already makes, and the total is unchanged.
+ */
+function chunkMetrics(seg: readonly ReplayedFix[]): {
+  readonly speed: (number | null)[];
+  readonly distanceM: number[];
+} {
+  const speed: (number | null)[] = seg.map(() => null);
+  const distanceM: number[] = seg.map(() => 0);
   let anchor = 0;
   for (let i = 1; i < seg.length; i += 1) {
     const fix = seg[i];
     const from = seg[anchor];
     if (fix === undefined || from === undefined || fix.distanceAddedM <= 0) continue;
     const dtS = (fix.sourceTimestamp - from.sourceTimestamp) / 1000;
-    const speed = dtS > 0 ? fix.distanceAddedM / dtS : null;
-    for (let k = anchor + 1; k <= i; k += 1) out[k] = speed;
+    const chunkSpeed = dtS > 0 ? fix.distanceAddedM / dtS : null;
+    // Edge durations use the app clock, like movingMs/stoppedMs in analyzeTrip.
+    const spanMs = (seg[i]?.recordedAt ?? 0) - (seg[anchor]?.recordedAt ?? 0);
+    for (let k = anchor + 1; k <= i; k += 1) {
+      speed[k] = chunkSpeed;
+      const edgeMs = (seg[k]?.recordedAt ?? 0) - (seg[k - 1]?.recordedAt ?? 0);
+      distanceM[k] = spanMs > 0 ? (fix.distanceAddedM * edgeMs) / spanMs : 0;
+    }
+    // Equal split when the app clock did not advance across the chunk (same-ms delivery).
+    if (spanMs <= 0) {
+      const share = fix.distanceAddedM / (i - anchor);
+      for (let k = anchor + 1; k <= i; k += 1) distanceM[k] = share;
+    }
     anchor = i;
   }
-  return out;
+  return { speed, distanceM };
 }
 
 /** Indices of fixes inside a window that proves a stop (compact AND slow for ≥ dwell). */

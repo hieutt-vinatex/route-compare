@@ -36,6 +36,7 @@ export function createTestServices(options: { secure?: boolean } = {}): TestServ
   const manualClock = new ManualClock();
   const mockLock = new MockRecorderLock();
   const config = DEFAULT_GPS_CONFIG;
+  const ids = sequentialIds('import');
   const tracker = new TrackingController({
     geolocation: geo,
     visibility: mockVisibility,
@@ -50,6 +51,7 @@ export function createTestServices(options: { secure?: boolean } = {}): TestServ
   return {
     config,
     clock: manualClock,
+    ids,
     geolocation: geo,
     visibility: mockVisibility,
     wakeLock: mockWakeLock,

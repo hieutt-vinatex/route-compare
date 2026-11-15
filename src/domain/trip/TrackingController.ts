@@ -182,7 +182,10 @@ export class TrackingController {
   private storageError = false;
   private internalError = false;
   private recorderBusy = false;
-  private wakeWanted = false;
+  // On by default: a screen lock stops the browser delivering fixes, so the default-off toggle
+  // silently cost whole trips (field trip 12/11/2026: 68 min, 64 s measured). The user can still
+  // turn it off; it only keeps the screen on while visible, it is NOT background recording.
+  private wakeWanted = true;
   private wakeFailed = false;
   private endEventsWritten = false;
   /** The open-gap marker at End is written once, even when the save is retried. */

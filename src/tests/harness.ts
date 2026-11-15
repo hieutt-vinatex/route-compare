@@ -183,6 +183,9 @@ export function createControllerHarness(
     timers,
     lock,
   });
+  // The app keeps the screen on by default; tests that assert event sequences opt out so the
+  // wake-lock events stay out of the way. The Wake Lock describe block turns it back on.
+  void controller.setKeepScreenOn(false);
   const emit = async (spec: SampleSpec): Promise<RawGpsSample> => {
     const sample = toSample(spec);
     clock.set(T0 + spec.t + (spec.latencyMs ?? DEFAULT_LATENCY_MS));

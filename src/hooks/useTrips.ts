@@ -14,10 +14,10 @@ export type LoadState<T> =
   | { readonly status: 'not-found' }
   | { readonly status: 'ready'; readonly data: T };
 
-type Loaded<T> =
+export type Loaded<T> =
   { readonly ok: true; readonly value: T } | { readonly ok: false; readonly message: string };
 
-async function settle<T>(work: Promise<T>): Promise<Loaded<T>> {
+export async function settle<T>(work: Promise<T>): Promise<Loaded<T>> {
   try {
     return { ok: true, value: await work };
   } catch (error: unknown) {

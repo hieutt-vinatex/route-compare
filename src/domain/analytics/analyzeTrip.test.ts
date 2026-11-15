@@ -192,6 +192,44 @@ describe('speeds (§7)', () => {
     expect(m.avgMovingKmh).toBeCloseTo(18, 0);
   });
 
+  it('every metre is booked on exactly one edge, spread over the chunk that measured it', () => {
+    const m = analyze(samples(straightLine({ count: 61, speedMps: 5, accuracyM: 20 })), 120_000);
+    const booked = m.edges.reduce((sum, e) => sum + e.distanceM, 0);
+    expect(booked).toBeCloseTo(m.distanceMeasuredM, 6);
+    // No edge may carry a whole drift step at once: 35 m in 1 s would read as 126 km/h.
+    for (const e of m.edges) {
+      const dtS = (e.to - e.from) / 1000;
+      if (dtS > 0) expect((e.distanceM / dtS) * 3.6).toBeLessThan(cfg.outlierSpeedKmh.MOTORBIKE);
+    }
+  });
+
+  it('avg moving speed divides only the distance measured while moving, not the whole trip', () => {
+    // Creeping below the 2 km/h stop threshold is UNKNOWN (no evidence of moving OR stopped), yet
+    // the drift filter still books its metres. Dividing the WHOLE distance by the few seconds that
+    // were classified MOVING is what printed “222,4 km/h” on a motorbike trip (field, 12/11/2026).
+    const creep = straightLine({ count: 601, speedMps: 0.4, accuracyM: 5 });
+    const burst = straightLine({
+      count: 21,
+      startT: 601_000,
+      speedMps: 2,
+      accuracyM: 5,
+      from: destinationPoint(ORIGIN, 90, 0.4 * 600),
+    });
+    const m = analyze([...samples(creep), ...samples(burst)], 622_000, 'WALK');
+
+    const movingDistance = m.edges
+      .filter((e) => e.cls === 'MOVING')
+      .reduce((sum, e) => sum + e.distanceM, 0);
+    expect(m.movingMs).toBeGreaterThan(0);
+    expect(movingDistance).toBeLessThan(m.distanceMeasuredM); // creep metres are not moving metres
+    expect(m.avgMovingKmh ?? 0).toBeCloseTo((movingDistance / (m.movingMs / 1000)) * 3.6, 6);
+    // The old formula: whole distance ÷ moving time — a walk that never happened.
+    expect((m.distanceMeasuredM / (m.movingMs / 1000)) * 3.6).toBeGreaterThan(
+      cfg.outlierSpeedKmh.WALK,
+    );
+    expect(m.avgMovingKmh ?? 0).toBeLessThan(cfg.outlierSpeedKmh.WALK);
+  });
+
   it('reports no speeds (null, “—”) without measured movement', () => {
     const m = analyze(samples([{ t: 0, lat: ORIGIN.lat, lng: ORIGIN.lng }]), 10_000);
     expect(m.avgElapsedKmh).toBeNull();

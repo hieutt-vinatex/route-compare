@@ -115,8 +115,18 @@ export function TripDetailPage() {
               testId="detail-quality"
             />
           )}
+          {trip.importedFrom === 'GPX' && (
+            <StatusPill tone="info" label="Nhập từ GPX" testId="trip-imported" />
+          )}
         </div>
       </div>
+
+      {trip.importedFrom === 'GPX' && (
+        <Notice tone="info" testId="imported-notice">
+          Nhập từ tệp GPX, không phải do RouteTrack đo. Số liệu tính lại từ các điểm trong tệp;
+          ngưỡng mất tín hiệu lấy theo nhịp ghi của chính tệp.
+        </Notice>
+      )}
 
       {!finished && (
         <Notice

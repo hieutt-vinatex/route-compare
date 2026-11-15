@@ -36,7 +36,13 @@ function asPositions(segment: readonly LatLng[]): LatLngExpression[] {
   return segment as LatLngExpression[];
 }
 
-const SegmentLayer = memo(function SegmentLayer({ segment }: { segment: readonly LatLng[] }) {
+const SegmentLayer = memo(function SegmentLayer({
+  segment,
+  color = SEGMENT_COLOR,
+}: {
+  segment: readonly LatLng[];
+  color?: string;
+}) {
   const first = segment[0];
   const last = segment.at(-1);
   return (
@@ -44,7 +50,7 @@ const SegmentLayer = memo(function SegmentLayer({ segment }: { segment: readonly
       <Polyline
         positions={asPositions(segment)}
         className="rt-segment"
-        pathOptions={{ color: SEGMENT_COLOR, weight: 5, opacity: 0.9 }}
+        pathOptions={{ color, weight: 5, opacity: 0.9 }}
       />
       {/* Hollow endpoints make the unmeasured gap between segments visible. */}
       {first !== undefined && (
@@ -53,7 +59,7 @@ const SegmentLayer = memo(function SegmentLayer({ segment }: { segment: readonly
           radius={4}
           className="rt-segment-end"
           pathOptions={{
-            color: SEGMENT_COLOR,
+            color,
             fillColor: '#ffffff',
             fillOpacity: 1,
             weight: 2,
@@ -66,7 +72,7 @@ const SegmentLayer = memo(function SegmentLayer({ segment }: { segment: readonly
           radius={4}
           className="rt-segment-end"
           pathOptions={{
-            color: SEGMENT_COLOR,
+            color,
             fillColor: '#ffffff',
             fillOpacity: 1,
             weight: 2,
@@ -129,6 +135,7 @@ function FitToTrack({ segments }: { segments: readonly (readonly LatLng[])[] }) 
 
 export default function TrackMap({
   segments,
+  segmentColors,
   trackVersion,
   current = null,
   startPoint = null,
@@ -176,7 +183,7 @@ export default function TrackMap({
           eventHandlers={tileHandlers}
         />
         {segments.map((segment, index) => (
-          <SegmentLayer key={index} segment={segment} />
+          <SegmentLayer key={index} segment={segment} color={segmentColors?.[index]} />
         ))}
         {startPoint !== null && (
           <CircleMarker

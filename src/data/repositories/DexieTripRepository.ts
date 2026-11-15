@@ -65,6 +65,19 @@ export class DexieTripRepository implements TripRepository {
     });
   }
 
+  async importTrip(
+    trip: Trip,
+    points: readonly GpsPoint[],
+    events: readonly TripEvent[],
+  ): Promise<void> {
+    const { trips, gpsPoints, tripEvents } = this.db;
+    await this.db.transaction('rw', [trips, gpsPoints, tripEvents], async () => {
+      await trips.add(trip);
+      await gpsPoints.bulkAdd([...points]);
+      await tripEvents.bulkAdd([...events]);
+    });
+  }
+
   async appendRawPoint(point: GpsPoint): Promise<void> {
     const { trips, gpsPoints } = this.db;
     await this.db.transaction('rw', [trips, gpsPoints], async () => {

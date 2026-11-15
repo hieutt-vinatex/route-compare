@@ -20,6 +20,7 @@ import { DEFAULT_GPS_CONFIG, type GpsConfig } from '@/domain/models/gpsConfig';
 import type {
   Clock,
   GeolocationAdapter,
+  IdGenerator,
   RecorderLock,
   TripRepository,
   VisibilityAdapter,
@@ -32,6 +33,7 @@ export type GpsSourceKind = 'browser' | 'demo';
 export interface AppServices {
   readonly config: GpsConfig;
   readonly clock: Clock;
+  readonly ids: IdGenerator;
   readonly geolocation: GeolocationAdapter;
   readonly visibility: VisibilityAdapter;
   readonly wakeLock: WakeLockAdapter;
@@ -77,6 +79,7 @@ export function createAppServices(options: CreateAppServicesOptions = {}): AppSe
   return {
     config,
     clock,
+    ids: uuidGenerator,
     geolocation,
     visibility,
     wakeLock,

@@ -15,7 +15,7 @@ test.describe('smoke (RT-002, NFR-01, NFR-11)', () => {
       page,
     }) => {
       await page.setViewportSize({ width, height: 800 });
-      for (const path of ['/', '/tracking', '/history', '/compare', '/trips/khong-co']) {
+      for (const path of ['/', '/tracking', '/history', '/compare', '/about', '/trips/khong-co']) {
         await page.goto(path);
         await expect(page.locator('main')).toBeVisible();
         const overflow = await page.evaluate(

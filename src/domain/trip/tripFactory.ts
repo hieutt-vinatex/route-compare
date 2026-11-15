@@ -38,6 +38,8 @@ export function createTrip(input: NewTripInput): Trip {
     qualityLabel: null,
     isIncomplete: false,
     metricsVersion: PROVISIONAL_METRICS_VERSION,
+    // Explicit: every row RouteTrack writes states it measured the track itself.
+    importedFrom: null,
     createdAt: input.startedAt,
     updatedAt: input.startedAt,
   };

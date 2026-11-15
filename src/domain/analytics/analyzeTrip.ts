@@ -77,6 +77,12 @@ export function analyzeTrip(input: AnalyzeTripInput): TripMetrics {
     );
   const movingMs = sumOf('MOVING');
   const stoppedMs = sumOf('STOPPED');
+  // Only the distance measured ON moving edges may be divided by moving time. Dividing the whole
+  // trip distance by it reports a speed the trip never reached whenever measured metres sit on
+  // UNKNOWN edges (short GPS windows after a screen lock) — review: 277 m / 4 s = 222 km/h.
+  const movingDistanceM = edges
+    .filter((e) => e.cls === 'MOVING')
+    .reduce((sum, e) => sum + e.distanceM, 0);
   const unknownMs = Math.max(0, elapsedMs - pausedMs - movingMs - stoppedMs);
 
   // Time with neither GPS edges nor a pause.
@@ -117,7 +123,8 @@ export function analyzeTrip(input: AnalyzeTripInput): TripMetrics {
       elapsedMs > 0 && replay.state.measuredEdgeCount > 0
         ? mpsToKmh(distance / (elapsedMs / 1000))
         : null,
-    avgMovingKmh: movingMs > 0 ? mpsToKmh(distance / (movingMs / 1000)) : null,
+    avgMovingKmh:
+      movingMs > 0 && movingDistanceM > 0 ? mpsToKmh(movingDistanceM / (movingMs / 1000)) : null,
     maxSpeedKmh: enough ? mpsToKmh(movingSpeeds.at(-1) ?? 0) : null,
     // 0 only with a confirmed stop (BR-07); otherwise the slowest measured movement, or “—”.
     minSpeedKmh:

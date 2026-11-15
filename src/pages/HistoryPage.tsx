@@ -20,6 +20,7 @@ import {
   type HistoryStatus,
 } from '@/app/historyFilter';
 import { RecoveryNotice } from '@/components/tracking/RecoveryNotice';
+import { DataTransfer } from '@/components/trip/DataTransfer';
 import { qualityTone } from '@/components/trip/quality';
 import { Button } from '@/components/ui/Button';
 import { buttonClass } from '@/components/ui/buttonClass';
@@ -65,6 +66,7 @@ export function HistoryPage() {
     <div className="mx-auto w-full max-w-3xl space-y-4 p-4">
       <h1 className="text-2xl font-bold text-slate-900">Lịch sử</h1>
       <RecoveryNotice recovery={recovery} />
+      <DataTransfer />
       {trips.status === 'loading' && <p className="text-sm text-slate-600">Đang tải…</p>}
       {trips.status === 'error' && <Notice tone="error">Không đọc được dữ liệu hành trình.</Notice>}
       {trips.status === 'ready' && trips.data.length === 0 && (
@@ -225,6 +227,10 @@ function TripRow({ trip }: { readonly trip: Trip }) {
               />
             )}
             {trip.isIncomplete && <StatusPill live={false} tone="warn" label="Chưa đầy đủ" />}
+            {/* Imported tracks are not RouteTrack measurements; never let them look like one. */}
+            {trip.importedFrom === 'GPX' && (
+              <StatusPill live={false} tone="info" label="Nhập từ GPX" />
+            )}
           </div>
         </>
       ) : (

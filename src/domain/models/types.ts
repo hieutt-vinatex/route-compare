@@ -153,6 +153,15 @@ export interface Trip {
   readonly qualityLabel: QualityLabel | null;
   readonly isIncomplete: boolean;
   readonly metricsVersion: number;
+  /**
+   * Where the raw track came from. null/undefined = measured by RouteTrack on this device.
+   * 'GPX' = read from a file a background logger produced: RouteTrack did NOT observe it, so it
+   * must stay visibly distinct from its own measurements (rows written before M4 have no field).
+   */
+  readonly importedFrom?: ImportSource | null;
   readonly createdAt: number;
   readonly updatedAt: number;
 }
+
+export const IMPORT_SOURCES = ['GPX'] as const;
+export type ImportSource = (typeof IMPORT_SOURCES)[number];

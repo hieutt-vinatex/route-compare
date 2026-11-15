@@ -5,6 +5,7 @@
  */
 import { useMemo } from 'react';
 import { analyzeTrip, type TripMetrics } from '@/domain/analytics/analyzeTrip';
+import { importConfig } from '@/domain/import/importedTrip';
 import type { TripDetailData } from './useTrips';
 import { useServices } from './useServices';
 
@@ -17,6 +18,7 @@ export function useTripAnalysis(detail: TripDetailData | null): TripMetrics | nu
   const startedAt = detail?.trip.startedAt;
   const endedAt = detail?.trip.endedAt ?? null;
   const transportMode = detail?.trip.transportMode;
+  const importedFrom = detail?.trip.importedFrom ?? null;
   return useMemo(() => {
     if (
       status !== 'COMPLETED' ||
@@ -32,7 +34,15 @@ export function useTripAnalysis(detail: TripDetailData | null): TripMetrics | nu
       points,
       events,
       endedAt: endedAt ?? startedAt,
-      config,
+      // An imported file sets its own sampling rate; judging it by the live watchPosition rules
+      // would report every step as a gap and the whole track as 0 m.
+      config:
+        importedFrom === null
+          ? config
+          : importConfig(
+              points.map((p) => ({ timestamp: p.sourceTimestamp, accuracyM: p.accuracyM })),
+              config,
+            ),
     });
-  }, [status, startedAt, endedAt, transportMode, points, events, config]);
+  }, [status, startedAt, endedAt, transportMode, importedFrom, points, events, config]);
 }

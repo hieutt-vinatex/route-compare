@@ -2,16 +2,16 @@
 
 PWA **web-only, mobile-first, local-first** để ghi và so sánh hành trình GPS thực tế ngay trên trình duyệt. Không backend, không đăng nhập, dữ liệu vị trí không rời thiết bị.
 
-**Đặc tả:** v2.1 (05/11/2026) · **Trạng thái code:** ✅ M0 · M1 · M2 (IndexedDB, lọc GPS, analytics, tạm dừng, khôi phục, khóa một tab) · M3 (Lịch sử tìm/lọc, Chi tiết + biểu đồ tốc độ, đổi tên/xóa) · ⏳ M4–M5 chưa làm — xem [Trạng thái milestone](#trạng-thái-milestone).
+**Đặc tả:** v2.1 (05/11/2026) · **Trạng thái code:** ✅ M0 · M1 · M2 · M3 · M4 (So sánh, nhóm tuyến, Xuất/Nhập, Sao lưu) · 🔄 M5 (PWA + QA xong; còn field test thiết bị thật) — xem [Trạng thái milestone](#trạng-thái-milestone).
 
 > ## ⚠️ Giới hạn nền tảng — không thương lượng
 >
 > **Trình duyệt không bảo đảm tiếp tục cung cấp điểm GPS khi khóa màn hình hoặc chuyển sang ứng dụng/tab khác.** Theo W3C Geolocation, cập nhật vị trí chỉ dành cho trang đang hoạt động và hiển thị; Service Worker **không** lấy GPS chạy nền.
 >
 > - RouteTrack ghi liên tục **chỉ khi trang đang hiển thị**. Khoảng trang bị ẩn được đánh dấu **“không đo được” (UNKNOWN)**, tách thành đoạn GPS mới và **không** cộng đường thẳng nối qua khoảng đó.
-> - **Screen Wake Lock** (tùy chọn “Giữ màn hình sáng”) chỉ giữ màn hình sáng khi trang đang mở và hệ thống cho phép; nó **không** phải chế độ chạy nền và bị trình duyệt tự nhả khi trang bị ẩn.
+> - **Screen Wake Lock** (“Giữ màn hình sáng”, **bật sẵn** từ 14/11/2026) chỉ giữ màn hình sáng khi trang đang mở và hệ thống cho phép; nó **không** phải chế độ chạy nền và bị trình duyệt tự nhả khi trang bị ẩn. Tắt được, nhưng tắt rồi khóa màn hình thì chuyến gần như không đo được gì.
 > - Thời gian Start→End vẫn được đo đầy đủ; quãng đường chỉ là **“quãng đường GPS đo được”**.
-> - Nếu cần ghi GPS khi khóa màn hình, đó là yêu cầu **ngoài phạm vi web-only** (cần app native) — không giải quyết bằng thủ thuật JavaScript.
+> - Nếu cần ghi GPS khi khóa màn hình, đó là yêu cầu **ngoài phạm vi web-only** (cần app chạy nền) — không giải quyết bằng thủ thuật JavaScript. Cách dùng đúng: **mở web app và giữ trang hiển thị** trong suốt hành trình.
 
 ## Yêu cầu
 
@@ -85,12 +85,13 @@ Luồng một mẫu GPS: `watchPosition` → chuẩn hóa đơn vị → **hàng
 | **M1** | ✅ | Browser Geolocation adapter (idempotent, mock), Home có trạng thái quyền/vị trí, Tracking (Start/Hủy/Kết thúc có xác nhận, bản đồ nhiều segment, trạng thái tín hiệu, offline), Page Visibility + Wake Lock tùy chọn, hidden→gap không nối, Trip Detail tối thiểu |
 | **M2** | ✅ | Dexie/IndexedDB (schema v1, giao dịch, test migration), mô hình độ lệch đồng hồ, lọc OUTLIER + drift, phân loại MOVING/STOPPED/UNKNOWN, phân hoạch thời gian, coverage + nhãn chất lượng, Tạm dừng/Tiếp tục, checkpoint + timeout khi lưu, khôi phục sau reload, khóa một tab. GPS-001…011 |
 | **M3** | ✅ | Lịch sử: tìm theo tên (không phân biệt dấu), lọc phương tiện/ngày/trạng thái, bộ lọc nằm trên URL. Chi tiết: tính lại từ dữ liệu GPS gốc (bản đồ, số liệu, lý do “chưa đầy đủ” cùng một nguồn), cảnh báo chất lượng thấp, “Cách tính các số liệu”, biểu đồ tốc độ Chart.js (tải lười) tô vùng không xác định/tạm dừng, đổi tên, xóa có xác nhận (AC-08) |
-| M4 | ⏳ | So sánh 2–4 chuyến, nhóm A→B, route variant, xuất GPX/CSV/JSON |
-| M5 | ⏳ | PWA app-shell cache, QA & field test. **Đã sẵn sàng deploy** Cloudflare Pages (header bảo mật/CSP, SPA fallback) — xem [Deploy](#deploy-cloudflare-pages--miễn-phí) |
+| **M4** | ✅ | Nhóm tuyến A→B (150 m, cùng phương tiện, chiều ngược là nhóm khác), So sánh 2–4 chuyến (bản đồ chồng tuyến nhiều màu, bảng chênh lệch, cảnh báo độ phủ thấp/khác phương tiện), Trung vị + P90 **chỉ khi đủ 3 chuyến**, Xuất GPX/CSV/JSON mỗi chuyến, Nhập GPX, Sao lưu/Khôi phục toàn bộ JSON (không ghi đè) |
+| **M5** | 🔄 | PWA: manifest + service worker **chỉ cache app shell** (không tải sẵn ô bản đồ, không đụng GPS), trang Giới thiệu/Quyền riêng tư/Giới hạn, QA 360/390/1280 px bằng Playwright, deploy Cloudflare Pages. Còn lại: **RT-505 field test trên thiết bị thật** |
 
 ### Giới hạn đã biết (sau M3)
 
 - Mọi ngưỡng (độ chính xác 30 m, gap 20 s, dung sai đồng hồ 5 s, drift, outlier, dừng 2 km/h/15 s/20 m) là **heuristic chưa hiệu chỉnh thực địa**.
+- Các đoạn GPS ngắn (vài giây sau khi mở lại màn hình) thường **không đủ bằng chứng** để kết luận đi hay dừng: cần ≥ 5 s để vượt sai số vị trí và ≥ 15 s để xác nhận dừng. Chúng được tính là UNKNOWN, nên “Thời gian di chuyển” và “Độ phủ GPS” của một chuyến bị khóa màn hình liên tục sẽ rất thấp — đó là dữ liệu thật, không phải lỗi hiển thị.
 - Mẫu GPS đầu tiên của mỗi chuyến chỉ để hiệu chỉnh đồng hồ (mất ~1 s đầu).
 - Trong ~3 s đầu mỗi đoạn, “tốc độ hiện tại” có thể bị một điểm nhiễu kéo lên.
 - Khi thiết bị không báo `coords.speed`, “tốc độ hiện tại” hiện **—** cho tới khi độ dời vượt sai số GPS (đi bộ với sai số 15 m: ~18 s đầu) và chỉ hiện **0 km/h** sau khi đứng yên ≥ 15 s (BR-07).
@@ -98,7 +99,10 @@ Luồng một mẫu GPS: `watchPosition` → chuẩn hóa đơn vị → **hàng
 - Khi thiết bị không báo `coords.speed`, một lần dừng ngắn hơn 15 s có thể được tính như di chuyển chậm (không bao giờ là “dừng”).
 - Bộ lọc nhiễu tính quãng đường theo “bước neo”: đường cong gắt với độ chính xác 15–30 m bị **đánh giá thấp** (ví dụ mô phỏng đường bậc thang: đo 299 m / thực 419 m).
 - Trên trình duyệt không có Web Locks (iOS < 15.4) khóa một-tab dùng lease 15 s; tab bị ẩn lâu có thể mất quyền ghi cho tab khác và sẽ tự dừng ghi khi phát hiện.
-- So sánh, nhóm A→B và Xuất/Nhập dữ liệu (M4) chưa làm; chưa lọc theo tuyến (route group, M4).
+- Nhóm tuyến dùng ghép tham lam quanh chuyến mới nhất của nhóm; chuyến thiếu điểm đầu hoặc điểm cuối GPS **không** ghép nhóm được nên không xuất hiện ở trang So sánh.
+- Trung vị/P90 lấy theo thứ hạng gần nhất trên đúng các chuyến bạn chọn, không nội suy và không gộp các nhóm khác.
+- Biểu tượng PWA dùng một tệp SVG (`sizes="any"`); chưa có bộ PNG 192/512 vì toolchain chưa có bộ rasterise.
+- Chuyến **nhập từ GPX** dùng ngưỡng mất tín hiệu riêng, lấy theo nhịp ghi của chính tệp (3 × khoảng cách thời gian trung vị, tối thiểu 20 s) — vì logger ghi mỗi 30 s không phải là “mất GPS 30 s”. Nếu tệp không ghi độ chính xác, bộ lọc nhiễu chỉ còn ngưỡng 2 m nên **lúc đứng yên có thể bị cộng dư quãng đường**; HDOP (nếu có) được quy đổi ước lượng × 5 m.
 - Danh sách Lịch sử không phân trang (phù hợp vài trăm chuyến). Biểu đồ gộp theo thời gian còn ~600 điểm, cộng tối đa 2 điểm cho mỗi khoảng ngắt (chuyến có hàng trăm khoảng mất GPS có thể vẽ nhiều điểm hơn).
 - Thời gian dùng đồng hồ hệ thống: nếu đổi giờ thiết bị **trong lúc** đang ghi, tổng thời gian chuyến đó có thể sai. Không dùng đồng hồ đơn điệu (`performance.now()`) vì trên iOS/macOS nó ngừng chạy khi máy ngủ — thời gian khóa màn hình sẽ biến mất khỏi chuyến.
 - Số liệu ở Lịch sử là bản tóm tắt lưu lúc Kết thúc; trang Chi tiết tính lại từ dữ liệu gốc — trùng nhau khi thuật toán/ngưỡng chưa đổi.

@@ -6,12 +6,14 @@ import { Notice } from '@/components/ui/Notice';
 import type { Trip } from '@/domain/models/types';
 import { normalizeTripName, TRIP_NAME_MAX } from '@/domain/trip/tripName';
 import { useTripActions } from '@/hooks/useTripActions';
+import { useTripExport, type ExportFormat } from '@/hooks/useTripExport';
 
 type Dialog = 'none' | 'rename' | 'delete';
 
 /** Rename / delete a finished trip (docs/06 §4 actions, FR-14). Never shown while recording. */
 export function TripActions({ trip }: { readonly trip: Trip }) {
   const { rename, remove } = useTripActions();
+  const { exportTrip, busy: exporting, error: exportError } = useTripExport();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<Dialog>('none');
   const [name, setName] = useState(trip.name);
@@ -82,6 +84,27 @@ export function TripActions({ trip }: { readonly trip: Trip }) {
           Xóa hành trình
         </Button>
       </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-slate-600">Xuất:</span>
+        {(['gpx', 'csv', 'json'] as const).map((format: ExportFormat) => (
+          <Button
+            key={format}
+            variant="secondary"
+            disabled={exporting}
+            onClick={() => {
+              void exportTrip(trip, format);
+            }}
+          >
+            {format.toUpperCase()}
+          </Button>
+        ))}
+      </div>
+      {exportError !== null && (
+        <Notice tone="error" testId="trip-export-error">
+          {exportError}
+        </Notice>
+      )}
 
       <ConfirmDialog
         open={dialog === 'rename'}

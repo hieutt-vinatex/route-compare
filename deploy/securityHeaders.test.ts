@@ -72,6 +72,10 @@ describe('cloudflareHeadersFile', () => {
     const file = cloudflareHeadersFile(DEFAULT_TILE_URL);
     expect(file.startsWith('/*\n  Content-Security-Policy: ')).toBe(true);
     expect(file).toContain('/assets/*\n  Cache-Control: public, max-age=31536000, immutable');
+    // Fixed-url files: a cached copy would keep serving the old app shell after a deploy.
+    for (const path of ['/sw.js', '/registerSW.js', '/manifest.webmanifest']) {
+      expect(file).toContain(`${path}\n  Cache-Control: no-cache`);
+    }
     // Cloudflare limit: 2,000 characters per header value.
     for (const line of file.split('\n')) expect(line.length).toBeLessThan(2_000);
   });

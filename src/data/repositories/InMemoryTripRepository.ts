@@ -61,6 +61,14 @@ export class InMemoryTripRepository implements TripRepository {
     return Promise.resolve();
   }
 
+  importTrip(trip: Trip, points: readonly GpsPoint[], events: readonly TripEvent[]): Promise<void> {
+    if (this.trips.has(trip.id)) return Promise.reject(new Error(`Trip ${trip.id} already exists`));
+    this.trips.set(trip.id, structuredClone(trip));
+    for (const point of points) this.points.set(point.id, structuredClone(point));
+    for (const event of events) this.events.set(event.id, structuredClone(event));
+    return Promise.resolve();
+  }
+
   appendRawPoint(point: GpsPoint): Promise<void> {
     if (!this.trips.has(point.tripId)) {
       return Promise.reject(new Error(`Trip ${point.tripId} not found`));
