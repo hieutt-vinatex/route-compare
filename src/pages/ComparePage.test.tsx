@@ -62,6 +62,28 @@ describe('Compare page', () => {
     expect(within(table).getByText('nhanh nhất')).toBeInTheDocument();
   });
 
+  it('never shows rows for a selection that is no longer ticked (slow storage)', async () => {
+    // CI reproduced this: Dexie's useLiveQuery keeps serving the PREVIOUS result while it re-runs,
+    // so ticking the 2nd trip briefly rendered a one-row "comparison" of the 1st.
+    await store('Chuyen A', { startedAt: 1_000_000 });
+    await store('Chuyen B', { startedAt: 2_000_000 });
+    const listPoints = services.repository.listPoints.bind(services.repository);
+    services.repository.listPoints = async (id: string) => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return listPoints(id);
+    };
+    renderApp('/compare', services);
+
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Chuyen A/ }));
+    // Let the one-trip analysis finish first — that finished result is the stale value the hook
+    // would otherwise keep serving while the two-trip analysis runs.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Chuyen B/ }));
+
+    const table = await screen.findByTestId('compare-table');
+    expect(within(table).getAllByRole('row')).toHaveLength(3);
+  });
+
   it('never claims same endpoints mean the same road', async () => {
     await store('Chuyen A', { startedAt: 1_000_000 });
     await store('Chuyen B', { startedAt: 2_000_000 });

@@ -50,5 +50,8 @@ export function useComparedTrips(trips: readonly Trip[]): LoadState<readonly Com
   );
   if (result === undefined) return { status: 'loading' };
   if (!result.ok) return { status: 'error', message: result.message };
+  // useLiveQuery keeps serving the PREVIOUS result while it re-runs for a new selection. Reporting
+  // it as ready would show a comparison table whose rows are not the trips that are ticked.
+  if (result.value.map((t) => t.trip.id).join(',') !== key) return { status: 'loading' };
   return { status: 'ready', data: result.value };
 }
