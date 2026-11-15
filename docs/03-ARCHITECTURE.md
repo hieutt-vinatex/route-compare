@@ -136,7 +136,7 @@ Một lỗi async write không được silently swallowed. Nếu persist raw th
 
 ## 9. CI/CD cơ bản
 
-Workflow GitHub Actions (`.github/workflows/ci.yml`): checkout → `npm ci` → typecheck → lint → format → test → build → Playwright E2E → deploy bằng Wrangler khi push `main` và mọi kiểm tra đều đạt. Project Cloudflare Pages `routetrack` dùng Direct Upload, output `dist` đã kiểm thử, production tại <https://routetrack-d29.pages.dev>. Token Account → Cloudflare Pages → Edit nằm trong repository secret `CLOUDFLARE_API_TOKEN`, chỉ truyền cho bước deploy. PR chỉ chạy CI; chưa có preview tự động. Cấu hình `VITE_*` phải có trong môi trường build GitHub Actions, không lấy từ Pages Variables.
+Workflow GitHub Actions (`.github/workflows/ci.yml`): checkout → `npm ci` → typecheck → lint → format → test → build → Playwright E2E → deploy bằng Wrangler khi push `main` và mọi kiểm tra đều đạt. Project Cloudflare Pages `routetrack` dùng Direct Upload, output `dist` đã kiểm thử, production tại <https://routetrack-d29.pages.dev>. Token Account → Cloudflare Pages → Edit nằm trong repository secret `ROUTE_COMPARE`, chỉ truyền cho bước deploy. PR chỉ chạy CI; chưa có preview tự động. Cấu hình `VITE_*` phải có trong môi trường build GitHub Actions, không lấy từ Pages Variables.
 
 ## 10. Architecture Decision Records
 

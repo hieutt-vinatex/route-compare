@@ -166,7 +166,7 @@ Project dùng **Direct Upload**. Cloudflare không hỗ trợ chuyển project n
 Thiết lập credential một lần:
 
 1. Tại [Cloudflare Account API Tokens](https://dash.cloudflare.com/e7420968b9c4ed515c72372e953f9033/api-tokens), tạo custom token có quyền **Account → Cloudflare Pages → Edit**, chỉ cho tài khoản này.
-2. Tại [GitHub → Settings → Secrets and variables → Actions](https://github.com/hieutt-vinatex/route-compare/settings/secrets/actions), tạo **repository secret** `CLOUDFLARE_API_TOKEN` chứa token. Không đưa token vào code hoặc biến `VITE_*`.
+2. Tại [GitHub → Settings → Secrets and variables → Actions](https://github.com/hieutt-vinatex/route-compare/settings/secrets/actions), tạo **repository secret** `ROUTE_COMPARE` chứa Cloudflare API token. Không đưa token vào code hoặc biến `VITE_*`.
 
 Mỗi push lên `main` chạy toàn bộ CI, rồi deploy chính thư mục `dist` đã được build/E2E kiểm tra, bao gồm `_headers`. Pull request chỉ chạy kiểm tra, không deploy và không dùng token Cloudflare. Workflow dùng Node từ `.nvmrc`; GitHub token chỉ cần `contents: read`.
 
