@@ -23,7 +23,7 @@
 - [x] Browser storage adapter, History data-transfer storage UI/tests, PWA assets/config, actual offline E2E and accessibility checks.
 - [x] Update SRS implementation definitions, acceptance matrix, roadmap and README. Record reproducible QA evidence and pending real-device checks.
 - [x] Run `npm ci`, typecheck, lint, format check, unit tests, build, Playwright at 360/390px and review changes.
-- [ ] Commit, push, watch CI/deploy and verify production. See the matching commit's Actions run for deployment evidence.
+- [x] Commit, push, watch CI/deploy and verify production. Commit `dde2e33`, Actions run `44105213978` passed all gates and deployed. Production variant/private-export/offline smoke checks passed. Real-device acceptance remains tracked separately in `docs/11-M4-M5-QA.md`.
 
 ## Review focus
 
