@@ -326,7 +326,3 @@ describe('invariant: no distance across segment boundaries (randomised replay)',
     expect(state.distanceMeasuredM).toBeLessThanOrEqual(withinSegmentPath + 1e-6);
   });
 });
-
-describe('Deferred to M4', () => {
-  it.todo('GPS-012 reverse origin/destination not grouped (M4)');
-});

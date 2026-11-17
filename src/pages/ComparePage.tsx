@@ -7,7 +7,13 @@
  */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { formatDateTime, formatDistance, formatDuration, formatPercent } from '@/app/format';
+import {
+  formatDateTime,
+  formatDistance,
+  formatDuration,
+  formatPercent,
+  formatSpeedKmh,
+} from '@/app/format';
 import { QUALITY_LABELS, TRANSPORT_MODE_LABELS } from '@/app/format';
 import { LazyTrackMap } from '@/components/map/LazyTrackMap';
 import { qualityTone } from '@/components/trip/quality';
@@ -20,6 +26,8 @@ import {
   MAX_COMPARED_TRIPS,
   MIN_COMPARED_TRIPS,
   MIN_TRIPS_FOR_DISTRIBUTION,
+  summarizeVariants,
+  DEFAULT_COMPARE_OPTIONS,
 } from '@/domain/compare/compare';
 import { groupTrips } from '@/domain/compare/grouping';
 import type { LatLng } from '@/domain/models/types';
@@ -47,8 +55,16 @@ export function ComparePage() {
     () => candidates.filter((t) => selectedIds.includes(t.id)).slice(0, MAX_COMPARED_TRIPS),
     [candidates, selectedIds],
   );
-  const analysis = useComparedTrips(selected);
-  const data = useMemo(() => (analysis.status === 'ready' ? analysis.data : []), [analysis]);
+  const analysis = useComparedTrips(candidates);
+  const groupData = useMemo(() => (analysis.status === 'ready' ? analysis.data : []), [analysis]);
+  const data = useMemo(
+    () => groupData.filter((item) => selected.some((trip) => trip.id === item.trip.id)),
+    [groupData, selected],
+  );
+  const distributions = useMemo(
+    () => summarizeVariants(groupData, config.quality.goodCoveragePct),
+    [groupData, config],
+  );
   const loading = analysis.status === 'loading' && selected.length > 0;
   const error = analysis.status === 'error';
   const comparison = useMemo(
@@ -188,6 +204,17 @@ export function ComparePage() {
               Các hành trình đã chọn khác phương tiện nên không so sánh ngang nhau được.
             </Notice>
           )}
+          {comparison.differentDates && (
+            <Notice tone="warn" testId="compare-different-dates">
+              Khác ngày khởi hành theo giờ địa phương; điều kiện có thể khác nhau.
+            </Notice>
+          )}
+          {comparison.differentDepartureWindows && (
+            <Notice tone="warn" testId="compare-different-windows">
+              Khác khung giờ khởi hành ({DEFAULT_COMPARE_OPTIONS.departureWindowMinutes} phút mỗi
+              khung, từ 00:00 giờ địa phương); điều kiện có thể khác nhau.
+            </Notice>
+          )}
           {comparison.lowCoverageCount > 0 && (
             <Notice tone="warn" testId="compare-low-coverage">
               {comparison.lowCoverageCount} hành trình có độ phủ GPS thấp. Quãng đường của chúng chỉ
@@ -203,9 +230,18 @@ export function ComparePage() {
             ariaLabel="Bản đồ chồng các hành trình đã chọn"
           />
 
-          <div className="overflow-x-auto">
+          <p className="text-sm text-slate-600">
+            Chênh lệch thời gian và % so với chuyến nhanh nhất; chênh lệch GPS đo được so với giá
+            trị đo ngắn nhất trong các chuyến đã chọn. Các tốc độ dùng km/h.
+          </p>
+          <div
+            className="overflow-x-auto"
+            tabIndex={0}
+            role="region"
+            aria-label="Bảng so sánh có thể cuộn ngang"
+          >
             <table
-              className="w-full min-w-[32rem] border-collapse text-sm"
+              className="w-full min-w-[90rem] border-collapse text-sm"
               data-testid="compare-table"
             >
               <caption className="sr-only">Bảng so sánh hành trình</caption>
@@ -213,6 +249,12 @@ export function ComparePage() {
                 <tr className="text-left text-slate-600">
                   <th scope="col" className="p-2">
                     Hành trình
+                  </th>
+                  <th scope="col" className="p-2">
+                    Khởi hành
+                  </th>
+                  <th scope="col" className="p-2">
+                    Biến thể tuyến
                   </th>
                   <th scope="col" className="p-2">
                     Thời gian
@@ -223,9 +265,22 @@ export function ComparePage() {
                   <th scope="col" className="p-2">
                     GPS đo được
                   </th>
-                  <th scope="col" className="p-2">
-                    Độ phủ
-                  </th>
+                  {[
+                    'Chênh lệch GPS đo được',
+                    'Di chuyển',
+                    'Đứng yên',
+                    'Tạm dừng',
+                    'Không rõ',
+                    'TB toàn chuyến',
+                    'TB di chuyển',
+                    'Cao nhất đã lọc',
+                    'Thấp nhất đã lọc',
+                    'Độ phủ',
+                  ].map((label) => (
+                    <th key={label} scope="col" className="p-2">
+                      {label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -251,13 +306,35 @@ export function ComparePage() {
                         )}
                       </span>
                     </th>
+                    <td className="p-2 tabular-nums">{formatDateTime(row.startedAt)}</td>
+                    <td className="p-2">{row.routeVariantLabel ?? '—'}</td>
                     <td className="p-2 tabular-nums">{formatDuration(row.elapsedMs)}</td>
                     <td className="p-2 tabular-nums">
                       {row.tripId === comparison.fastestTripId
                         ? 'nhanh nhất'
                         : `+${formatDuration(row.elapsedDeltaMs)}`}
+                      <span className="block">
+                        {row.elapsedDeltaPct === null
+                          ? '—'
+                          : `+${formatPercent(row.elapsedDeltaPct)}`}
+                      </span>
                     </td>
                     <td className="p-2 tabular-nums">{formatDistance(row.distanceMeasuredM)}</td>
+                    <td className="p-2 tabular-nums">+{formatDistance(row.distanceDeltaM)}</td>
+                    {[row.movingMs, row.stoppedMs, row.pausedMs, row.unknownMs].map(
+                      (duration, i) => (
+                        <td key={i} className="p-2 tabular-nums">
+                          {formatDuration(duration)}
+                        </td>
+                      ),
+                    )}
+                    {[row.avgElapsedKmh, row.avgMovingKmh, row.maxSpeedKmh, row.minSpeedKmh].map(
+                      (speed, i) => (
+                        <td key={i} className="p-2 tabular-nums">
+                          {formatSpeedKmh(speed)}
+                        </td>
+                      ),
+                    )}
                     <td className="p-2">
                       <StatusPill
                         live={false}
@@ -270,13 +347,48 @@ export function ComparePage() {
               </tbody>
             </table>
           </div>
-
-          <p className="text-sm text-slate-600" data-testid="compare-distribution">
-            {comparison.medianElapsedMs === null
-              ? `Trung vị và P90 cần ít nhất ${String(MIN_TRIPS_FOR_DISTRIBUTION)} hành trình để có ý nghĩa — hiện chưa đủ.`
-              : `Trung vị ${formatDuration(comparison.medianElapsedMs)} · P90 ${formatDuration(comparison.p90ElapsedMs ?? 0)} (trên ${String(comparison.rows.length)} hành trình).`}
-          </p>
         </>
+      )}
+      {analysis.status === 'ready' && distributions.length > 0 && (
+        <section
+          className="space-y-3 text-sm text-slate-600"
+          data-testid="compare-distribution"
+          aria-label="Thống kê theo biến thể tuyến"
+        >
+          <h2 className="font-semibold text-slate-900">Thống kê toàn nhóm A→B</h2>
+          <p>
+            Tính trên tất cả chuyến trong nhóm, độc lập với tối đa 4 chuyến chồng bản đồ. Tách riêng
+            theo tên biến thể, phương tiện và khung giờ địa phương. Chưa đặt tên biến thể thì không
+            coi là cùng đường.
+          </p>
+          {distributions.map((stats, i) => (
+            <div key={i} className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+              <h3 className="font-semibold text-slate-900">
+                {stats.routeVariantLabel ?? 'Chưa đặt tên biến thể'} ·{' '}
+                {TRANSPORT_MODE_LABELS[stats.transportMode]} · {stats.departureWindowLabel}
+              </h3>
+              <p>
+                {stats.sampleCount} hành trình · {stats.dateCount} ngày
+              </p>
+              <p>
+                Trung vị {formatDuration(stats.medianElapsedMs)} · P90{' '}
+                {formatDuration(stats.p90ElapsedMs)} · Độ lệch chuẩn (tổng thể){' '}
+                {formatDuration(stats.stddevElapsedMs)}
+              </p>
+              {stats.medianElapsedMs === null && (
+                <p>
+                  Trung vị, P90 và độ lệch chuẩn cần ít nhất {MIN_TRIPS_FOR_DISTRIBUTION} hành trình
+                  có tên biến thể cùng điều kiện — hiện chưa đủ.
+                </p>
+              )}
+              <p>
+                {stats.sufficientForEvaluation
+                  ? 'Đủ mẫu để đánh giá: ít nhất 5 chuyến, 3 ngày và GPS tốt. Chưa kết luận tuyến ổn định; cần xem độ biến thiên và điều kiện thực tế.'
+                  : 'Chưa đủ điều kiện đánh giá xu hướng: cần ít nhất 5 chuyến mỗi biến thể trong 3 ngày, cùng khung giờ và GPS tốt, đầy đủ.'}
+              </p>
+            </div>
+          ))}
+        </section>
       )}
     </Shell>
   );

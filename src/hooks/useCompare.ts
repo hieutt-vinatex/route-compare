@@ -42,16 +42,16 @@ async function analyseOne(
 
 export function useComparedTrips(trips: readonly Trip[]): LoadState<readonly ComparedTrip[]> {
   const { repository, config } = useServices();
-  const key = trips.map((t) => t.id).join(',');
+  const key = JSON.stringify(trips);
   const result = useLiveQuery(
     () => settle(Promise.all(trips.map((trip) => analyseOne(repository, trip, config)))),
-    // `key` stands for the selection; the Trip objects get a new identity on every list refresh.
+    // Include metadata edits (especially variant labels), not object identity or only IDs.
     [key, repository, config],
   );
   if (result === undefined) return { status: 'loading' };
   if (!result.ok) return { status: 'error', message: result.message };
   // useLiveQuery keeps serving the PREVIOUS result while it re-runs for a new selection. Reporting
   // it as ready would show a comparison table whose rows are not the trips that are ticked.
-  if (result.value.map((t) => t.trip.id).join(',') !== key) return { status: 'loading' };
+  if (JSON.stringify(result.value.map((t) => t.trip)) !== key) return { status: 'loading' };
   return { status: 'ready', data: result.value };
 }

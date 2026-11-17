@@ -40,6 +40,17 @@ export class InMemoryTripRepository implements TripRepository {
     return Promise.resolve();
   }
 
+  setRouteVariant(id: string, label: string | null, updatedAt: number): Promise<void> {
+    const normalized = label?.trim() || null;
+    if (normalized !== null && normalized.length > 120) {
+      return Promise.reject(new RangeError('Route variant must be at most 120 characters'));
+    }
+    const existing = this.trips.get(id);
+    if (existing?.status !== 'COMPLETED') return Promise.reject(new TripNotEditableError(id));
+    this.trips.set(id, { ...existing, routeVariantLabel: normalized, updatedAt });
+    return Promise.resolve();
+  }
+
   getTrip(id: string): Promise<Trip | undefined> {
     const trip = this.trips.get(id);
     return Promise.resolve(trip === undefined ? undefined : structuredClone(trip));

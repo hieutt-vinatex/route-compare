@@ -34,7 +34,7 @@ async function bundleOf(repository: TripRepository, trip: Trip): Promise<TripBun
 }
 
 export function useTripExport(): {
-  exportTrip: (trip: Trip, format: ExportFormat) => Promise<void>;
+  exportTrip: (trip: Trip, format: ExportFormat, privacyRadiusM?: number) => Promise<void>;
   busy: boolean;
   error: string | null;
 } {
@@ -43,20 +43,25 @@ export function useTripExport(): {
   const [error, setError] = useState<string | null>(null);
 
   const exportTrip = useCallback(
-    async (trip: Trip, format: ExportFormat) => {
+    async (trip: Trip, format: ExportFormat, privacyRadiusM = 0) => {
       setBusy(true);
       setError(null);
       try {
+        if (format === 'json' && privacyRadiusM !== 0) {
+          throw new RangeError('JSON là bản sao lưu đầy đủ. Chọn GPX hoặc CSV để ẩn đầu/cuối.');
+        }
         const bundle = await bundleOf(repository, trip);
         const text =
           format === 'gpx'
-            ? toGpx(bundle, config)
+            ? toGpx(bundle, config, privacyRadiusM)
             : format === 'csv'
-              ? toCsv(bundle)
+              ? toCsv(bundle, privacyRadiusM, config)
               : toBackupJson([bundle], Date.now());
         downloadText(exportFileName(trip, format), MIME[format], text);
-      } catch {
-        setError('Không xuất được dữ liệu hành trình.');
+      } catch (cause) {
+        setError(
+          cause instanceof RangeError ? cause.message : 'Không xuất được dữ liệu hành trình.',
+        );
       } finally {
         setBusy(false);
       }

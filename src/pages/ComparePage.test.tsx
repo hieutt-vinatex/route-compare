@@ -10,7 +10,7 @@ import { destinationPoint } from '@/domain/geo/haversine';
 import { DEFAULT_GPS_CONFIG } from '@/domain/models/gpsConfig';
 import type { Trip } from '@/domain/models/types';
 import { createTrip } from '@/domain/trip/tripFactory';
-import { ORIGIN, straightLine } from '@/tests/fixtures/gpsFixtures';
+import { ORIGIN, straightLine, T0 } from '@/tests/fixtures/gpsFixtures';
 import { persistedTrip, samples } from '@/tests/fixtures/persistedTrip';
 import { createTestServices, renderApp, type TestServices } from '@/tests/renderApp';
 
@@ -43,8 +43,13 @@ async function store(
   };
   await services.repository.importTrip(
     trip,
-    built.points.map((p) => ({ ...p, tripId: id })),
-    built.events.map((e) => ({ ...e, tripId: id })),
+    built.points.map((p) => ({
+      ...p,
+      tripId: id,
+      sourceTimestamp: p.sourceTimestamp + startedAt - T0,
+      recordedAt: p.recordedAt + startedAt - T0,
+    })),
+    built.events.map((e) => ({ ...e, tripId: id, timestamp: e.timestamp + startedAt - T0 })),
   );
 }
 
@@ -137,5 +142,52 @@ describe('Compare page', () => {
     // Two groups → a group selector appears, and only one trip is listed per group.
     expect(await screen.findByText('Nhóm tuyến')).toBeInTheDocument();
     expect(DEFAULT_GPS_CONFIG.routeGroupRadiusM).toBe(150);
+  });
+});
+
+describe('complete comparison report', () => {
+  it('includes every duration/speed, departure and measured-distance delta with missing speeds as dashes', async () => {
+    await store('A', { startedAt: new Date(2026, 10, 1, 8).getTime(), count: 2 });
+    await store('B', { startedAt: new Date(2026, 10, 2, 10).getTime(), count: 2 });
+    renderApp('/compare', services);
+    await userEvent.click(await screen.findByRole('checkbox', { name: /^A/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: /^B/ }));
+    const table = await screen.findByTestId('compare-table');
+    for (const name of [
+      'Khởi hành',
+      'Di chuyển',
+      'Đứng yên',
+      'Tạm dừng',
+      'Không rõ',
+      'TB toàn chuyến',
+      'TB di chuyển',
+      'Cao nhất đã lọc',
+      'Thấp nhất đã lọc',
+      'Chênh lệch GPS đo được',
+    ]) {
+      expect(within(table).getByRole('columnheader', { name })).toBeInTheDocument();
+    }
+    expect(within(table).getAllByText('—').length).toBeGreaterThan(0);
+    expect(await screen.findByTestId('compare-different-dates')).toBeInTheDocument();
+    expect(await screen.findByTestId('compare-different-windows')).toBeInTheDocument();
+  });
+
+  it('uses all group trips for per-variant statistics while limiting the overlay to four', async () => {
+    for (let i = 0; i < 5; i++) {
+      await store(`A${String(i)}`, {
+        startedAt: new Date(2026, 10, 1 + i, 8).getTime(),
+        routeVariantLabel: 'Đường X',
+      });
+    }
+    renderApp('/compare', services);
+    const stats = await screen.findByTestId('compare-distribution');
+    expect(stats).toHaveTextContent('5 hành trình · 5 ngày');
+    expect(stats).toHaveTextContent('Đường X');
+    expect(stats).toHaveTextContent('Độ lệch chuẩn');
+    const boxes = await screen.findAllByRole('checkbox');
+    for (const box of boxes.slice(0, 4)) await userEvent.click(box);
+    expect(boxes[4]).toBeDisabled();
+    expect(within(await screen.findByTestId('compare-table')).getAllByRole('row')).toHaveLength(5);
+    expect(stats).toHaveTextContent('5 hành trình · 5 ngày');
   });
 });

@@ -12,6 +12,7 @@ import { TRANSPORT_MODES, type TransportMode } from '@/domain/models/types';
 import { useImportGpx, type ImportResult } from '@/hooks/useImportGpx';
 import { useBackup, type RestoreResult } from '@/hooks/useTripExport';
 import { useUiStore } from '@/stores/uiStore';
+import { PersistentStorageNotice } from './PersistentStorageNotice';
 
 export function DataTransfer() {
   const gpxId = useId();
@@ -103,6 +104,7 @@ export function DataTransfer() {
 
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-slate-900">Sao lưu và khôi phục</h2>
+        <PersistentStorageNotice />
         <p className="text-sm text-slate-600">
           Dữ liệu chỉ nằm trên thiết bị này. Xóa dữ liệu trình duyệt là mất hết — hãy tải bản sao
           lưu JSON định kỳ. Khôi phục không ghi đè hành trình đã có.

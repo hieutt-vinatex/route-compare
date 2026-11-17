@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { straightLine, T0 } from '@/tests/fixtures/gpsFixtures';
 import { persistedTrip, samples, type Step } from '@/tests/fixtures/persistedTrip';
 import { DEFAULT_GPS_CONFIG as cfg } from '../models/gpsConfig';
+import { destinationPoint, haversineM } from '../geo/haversine';
+import { replayTrack } from '../analytics/replay';
 import { BackupParseError, parseBackup } from './parseBackup';
 import {
   BACKUP_SCHEMA_VERSION,
@@ -31,6 +33,17 @@ const gapped = bundle([
 ]);
 
 describe('toGpx', () => {
+  it('keeps the sampling rules of imported GPX files when exporting them again', () => {
+    const slow = bundle(samples(straightLine({ count: 21, intervalMs: 30_000, speedMps: 5 })));
+    const imported = {
+      ...slow,
+      trip: { ...slow.trip, importedFrom: 'GPX' as const },
+      points: slow.points.map((p) => ({ ...p, accuracyM: null })),
+    };
+    const gpx = toGpx(imported, cfg);
+    expect(gpx.match(/<trkseg>/g) ?? []).toHaveLength(1);
+    expect((gpx.match(/<trkpt /g) ?? []).length).toBeGreaterThan(10);
+  });
   it('writes one <trkseg> per measured segment and never bridges the gap', () => {
     const gpx = toGpx(gapped, cfg);
     expect(gpx.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);
@@ -62,6 +75,119 @@ describe('toCsv', () => {
       points: one.points.map((p) => ({ ...p, rejectCode: null, id: 'a,"b"' })),
     });
     expect(csv).not.toContain('a,"b"'); // raw form would break the column count
+  });
+});
+
+describe('private endpoint export (FR-22)', () => {
+  const route = bundle(samples(straightLine({ count: 81, speedMps: 5 })));
+
+  it('removes every CSV sample inside either endpoint circle, including rejected samples', () => {
+    const csv = toCsv(route, 50);
+    const rows = csv.trimEnd().split('\n').slice(1);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBeLessThan(route.points.length);
+    const start = route.points[0]!;
+    const end = route.points.at(-1)!;
+    for (const row of rows) {
+      const cells = row.split(',');
+      const p = { lat: Number(cells[3]), lng: Number(cells[4]) };
+      expect(haversineM(p, { lat: start.latitude, lng: start.longitude })).toBeGreaterThan(50);
+      expect(haversineM(p, { lat: end.latitude, lng: end.longitude })).toBeGreaterThan(50);
+    }
+    expect(route.points).toHaveLength(81);
+  });
+
+  it('removes GPX endpoints after replay while preserving separate measured segments', () => {
+    const gpx = toGpx(route, cfg, 50);
+    const fixes = replayTrack({ ...route, config: cfg }).fixes;
+    const start = fixes[0]!;
+    const end = fixes.at(-1)!;
+    const coordinates = [...gpx.matchAll(/<trkpt lat="([^"]+)" lon="([^"]+)"/g)];
+    expect(coordinates.length).toBeGreaterThan(0);
+    for (const match of coordinates) {
+      const p = { lat: Number(match[1]), lng: Number(match[2]) };
+      expect(haversineM(p, start)).toBeGreaterThan(50);
+      expect(haversineM(p, end)).toBeGreaterThan(50);
+    }
+    expect(toGpx(gapped, cfg, 5).match(/<trkseg>/g) ?? []).toHaveLength(2);
+  });
+
+  it('starts a new CSV segment after revisiting a hidden endpoint area', () => {
+    const start = { lat: route.points[0]!.latitude, lng: route.points[0]!.longitude };
+    const distances = [0, 100, 150, 0, 200, 250, 400];
+    const points = distances.map((distance, i) => {
+      const p = destinationPoint(start, 90, distance);
+      return {
+        ...route.points[i]!,
+        latitude: p.lat,
+        longitude: p.lng,
+        accepted: true,
+        segmentId: 1,
+      };
+    });
+    const rows = toCsv({ ...route, points }, 30)
+      .trimEnd()
+      .split('\n')
+      .slice(1);
+    expect(rows).toHaveLength(4);
+    const segments = rows.map((row) => row.split(',')[10]);
+    expect(segments[0]).toBe(segments[1]);
+    expect(segments[2]).toBe(segments[3]);
+    expect(segments[0]).not.toBe(segments[2]);
+  });
+
+  it('gives imported raw samples explicit export runs across original and privacy boundaries', () => {
+    const origin = { lat: 20.3, lng: 105.75 };
+    const distances = [0, 100, 150, 0, 200, 250, 300, 350, 400];
+    const points = distances.map((distance, i) => {
+      const p = destinationPoint(origin, 90, distance);
+      return {
+        ...route.points[i]!,
+        sourceSeq: i * 2 + 1,
+        latitude: p.lat,
+        longitude: p.lng,
+        accepted: false,
+        segmentId: null,
+      };
+    });
+    const imported = {
+      ...route,
+      trip: { ...route.trip, importedFrom: 'GPX' as const },
+      points,
+      events: [
+        {
+          id: 'recovery',
+          tripId: route.trip.id,
+          seq: 12,
+          timestamp: points[6]!.recordedAt,
+          type: 'RECOVERY' as const,
+          metadata: null,
+        },
+      ],
+    };
+    const rows = toCsv(imported, 30).trimEnd().split('\n');
+    expect(rows[0]).toContain('exportRunId');
+    expect(rows.slice(1).map((row) => row.split(',')[10])).toEqual(['1', '1', '2', '2', '3', '3']);
+  });
+
+  it('splits GPX when a removed raw sample was rejected by the GPS filter', () => {
+    const first = route.points[0]!;
+    const points = route.points.map((p, i) =>
+      i === 40 ? { ...p, latitude: first.latitude, longitude: first.longitude } : p,
+    );
+    const withRejectedReturn = { ...route, points };
+    expect(toGpx(withRejectedReturn, cfg).match(/<trkseg>/g) ?? []).toHaveLength(1);
+    expect(toGpx(withRejectedReturn, cfg, 30).match(/<trkseg>/g) ?? []).toHaveLength(2);
+  });
+
+  it('rejects invalid radii, reports fully hidden routes, and keeps zero-radius exports compatible', () => {
+    expect(() => toGpx(route, cfg, -1)).toThrow(RangeError);
+    expect(() => toCsv(route, Number.NaN)).toThrow(RangeError);
+    expect(() => toGpx(route, cfg, 1000)).toThrow(/không còn điểm/i);
+    expect(() => toCsv(route, 1000)).toThrow(/không còn điểm/i);
+    expect(toCsv(route, 0)).toBe(toCsv(route));
+    expect(toGpx(route, cfg, 0)).toBe(toGpx(route, cfg));
+    expect(parseBackup(toBackupJson([route], T0))[0]?.points).toEqual(route.points);
   });
 });
 

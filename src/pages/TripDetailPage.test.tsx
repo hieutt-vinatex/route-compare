@@ -1,7 +1,8 @@
-import { screen, waitFor, within } from '@testing-library/react';
+﻿import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatDistance } from '@/app/format';
+import * as download from '@/adapters/download';
 import type { TrackMapProps } from '@/components/map/trackMapTypes';
 import { analyzeTrip } from '@/domain/analytics/analyzeTrip';
 import { destinationPoint } from '@/domain/geo/haversine';
@@ -58,6 +59,26 @@ function withGap(): Step[] {
 }
 
 describe('Trip Detail from one analysis (FR-10, RT-302, RT-304)', () => {
+  it('exports a private CSV through the detail controls and protects the full JSON backup', async () => {
+    await seedCompleted(samples(straightLine({ count: 81, speedMps: 5 })), 80_000);
+    const saveFile = vi.spyOn(download, 'downloadText').mockImplementation(() => undefined);
+    renderApp('/trips/d1', services);
+    const radius = await screen.findByLabelText('Ẩn đầu/cuối khi xuất (m)');
+    await userEvent.clear(radius);
+    await userEvent.type(radius, '50');
+    expect(screen.getByRole('button', { name: 'JSON' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'CSV' }));
+    await waitFor(() => {
+      expect(saveFile).toHaveBeenCalledTimes(1);
+    });
+    const csv = saveFile.mock.calls[0]?.[2] ?? '';
+    expect(csv.trimEnd().split('\n').length).toBeLessThan(82);
+    expect(await services.repository.listPoints('d1')).toHaveLength(81);
+    await userEvent.clear(radius);
+    await userEvent.type(radius, '-1');
+    expect(screen.getByRole('button', { name: 'CSV' })).toBeDisabled();
+    saveFile.mockRestore();
+  });
   it('map, counts and stats come from the replayed raw data, not stored live results (M10)', async () => {
     await seedCompleted(withGap(), 240_000, { distanceMeasuredM: 999_999 });
     renderApp('/trips/d1', services);

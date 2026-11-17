@@ -44,6 +44,18 @@ export class DexieTripRepository implements TripRepository {
     });
   }
 
+  async setRouteVariant(id: string, label: string | null, updatedAt: number): Promise<void> {
+    const normalized = label?.trim() || null;
+    if (normalized !== null && normalized.length > 120) {
+      throw new RangeError('Route variant must be at most 120 characters');
+    }
+    await this.db.transaction('rw', this.db.trips, async () => {
+      const existing = await this.db.trips.get(id);
+      if (existing?.status !== 'COMPLETED') throw new TripNotEditableError(id);
+      await this.db.trips.update(id, { routeVariantLabel: normalized, updatedAt });
+    });
+  }
+
   getTrip(id: string): Promise<Trip | undefined> {
     return this.db.trips.get(id);
   }

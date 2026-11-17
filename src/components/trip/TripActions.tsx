@@ -7,6 +7,7 @@ import type { Trip } from '@/domain/models/types';
 import { normalizeTripName, TRIP_NAME_MAX } from '@/domain/trip/tripName';
 import { useTripActions } from '@/hooks/useTripActions';
 import { useTripExport, type ExportFormat } from '@/hooks/useTripExport';
+import { RouteVariantEditor } from './RouteVariantEditor';
 
 type Dialog = 'none' | 'rename' | 'delete';
 
@@ -21,6 +22,10 @@ export function TripActions({ trip }: { readonly trip: Trip }) {
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
+  const radiusId = useId();
+  const [privacyRadius, setPrivacyRadius] = useState('0');
+  const radiusM = Number(privacyRadius);
+  const validRadius = privacyRadius.trim() !== '' && Number.isFinite(radiusM) && radiusM >= 0;
   const valid = normalizeTripName(name) !== null;
 
   const close = (): void => {
@@ -63,6 +68,7 @@ export function TripActions({ trip }: { readonly trip: Trip }) {
 
   return (
     <section aria-label="Thao tác với hành trình" className="space-y-2">
+      <RouteVariantEditor trip={trip} />
       <div className="flex flex-wrap gap-2">
         <Button
           variant="secondary"
@@ -85,15 +91,37 @@ export function TripActions({ trip }: { readonly trip: Trip }) {
         </Button>
       </div>
 
+      <div className="space-y-1">
+        <label htmlFor={radiusId} className="block text-sm font-medium text-slate-700">
+          Ẩn đầu/cuối khi xuất (m)
+        </label>
+        <input
+          id={radiusId}
+          type="number"
+          min="0"
+          step="1"
+          value={privacyRadius}
+          onChange={(e) => {
+            setPrivacyRadius(e.currentTarget.value);
+          }}
+          aria-describedby={`${radiusId}-help`}
+          aria-invalid={!validRadius}
+          className="block min-h-11 w-full rounded-xl border border-slate-300 px-3 text-base sm:w-48"
+        />
+        <p id={`${radiusId}-help`} className="text-sm text-slate-600">
+          GPX/CSV bỏ các điểm trong bán kính này quanh đầu và cuối chuyến. 0 m xuất toàn bộ. JSON
+          giữ đầy đủ dữ liệu để sao lưu, chỉ xuất khi bán kính là 0 m.
+        </p>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-slate-600">Xuất:</span>
         {(['gpx', 'csv', 'json'] as const).map((format: ExportFormat) => (
           <Button
             key={format}
             variant="secondary"
-            disabled={exporting}
+            disabled={exporting || !validRadius || (format === 'json' && radiusM !== 0)}
             onClick={() => {
-              void exportTrip(trip, format);
+              void exportTrip(trip, format, radiusM);
             }}
           >
             {format.toUpperCase()}

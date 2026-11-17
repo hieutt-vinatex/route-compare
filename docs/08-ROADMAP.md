@@ -51,6 +51,8 @@
 - RT-404: Export/Import JSON schema version, CSV/GPX segments. **Nhập GPX đã hiện thực (14/11/2026)**: `src/adapters/import/gpx.ts` đọc tệp, `src/domain/import/importedTrip.ts` dựng Trip/GpsPoint/TripEvent và phân tích bằng `analyzeTrip` với `importConfig` (ngưỡng gap theo nhịp ghi của tệp). Mỗi `<trkseg>` → sự kiện RECOVERY, không nối quãng đường qua ranh giới. Trip mang `importedFrom: 'GPX'` và hiển thị nhãn riêng ở Lịch sử + Chi tiết. Phần **xuất** đã xong: `src/domain/export/serialize.ts` (GPX một `<trkseg>` mỗi đoạn đo được, CSV đủ mẫu RAW kèm `rejectCode`, JSON sao lưu có `schemaVersion`) và `parseBackup.ts` kiểm tra từng dòng trước khi ghi vào IndexedDB; khôi phục **không ghi đè** chuyến đã có.
 - RT-405: Delete cascade, backup reminder, optional trim start/end of exported track.
 
+**Bổ sung M4 ngày 17/11/2026** — FR-19 chỉnh/xóa phương án đường bằng cập nhật metadata nguyên tử. FR-11 bảng đầy đủ thời gian/tốc độ, cảnh báo khác ngày/khung giờ. FR-20 median/P90/độ lệch chuẩn và số mẫu/ngày theo phương án, phương tiện, khung giờ trên toàn nhóm. FR-22 ẩn vùng đầu/cuối GPX/CSV, tách đoạn khi bỏ mẫu và giữ nguyên bản gốc. JSON là bản sao lưu đầy đủ. Các ngưỡng và điều kiện được định nghĩa trong SRS mục 8.
+
 ## M5 — Production readiness
 
 - RT-501: PWA manifest + SW only app-shell caching; do not prefetch OSM tiles. **Xong**: `deploy/pwa.ts` (+ test) — `globPatterns` chỉ app shell, **không** `runtimeCaching`, `injectRegister: 'script-defer'` để hợp CSP `script-src 'self'`.
@@ -58,6 +60,8 @@
 - RT-503: Docs and privacy/limitations screens, source attributions. **Xong**: route `/about` (`src/pages/AboutPage.tsx`), dùng lại `COPY.platformDetail`/`COPY.locationPrivacy` nên chỉ có một bản câu chữ.
 - RT-504: Cloudflare Pages deployment, HTTPS/SPA fallback; preview/prod deploy.
 - RT-505: Field testing + results (devices, browsers, GPS coverage, battery observations).
+
+**Trạng thái M5 ngày 17/11/2026** — FR-23 đã có yêu cầu persistent storage qua adapter, trạng thái thật và hướng dẫn sao lưu. RT-501 có PNG 192/512, maskable và Apple touch icon, cập nhật chờ đóng tab, test Service Worker thật/offline. RT-504 production CI/CD đã hoạt động. RT-502 được kiểm tra tự động ở 360/390/1280 px và ghi QA riêng. RT-505 vẫn chờ kiểm thử GPS, cài đặt PWA, pin và TalkBack/VoiceOver trên điện thoại thật.
 
 ## Quy trình làm việc với Codex/Claude Code
 

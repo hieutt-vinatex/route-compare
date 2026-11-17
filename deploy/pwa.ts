@@ -12,10 +12,11 @@
 import type { VitePWAOptions } from 'vite-plugin-pwa';
 
 export const PWA_OPTIONS: Partial<VitePWAOptions> = {
-  registerType: 'autoUpdate',
+  // Leave updates waiting until all existing tabs close; never reload a recording for an update.
+  registerType: 'prompt',
   // An external registration script: CSP is `script-src 'self'`, so an inline one would be blocked.
   injectRegister: 'script-defer',
-  includeAssets: ['favicon.svg'],
+  includeAssets: ['favicon.svg', 'icons/*.png'],
   manifest: {
     name: 'RouteTrack — ghi và so sánh hành trình GPS',
     short_name: 'RouteTrack',
@@ -29,15 +30,15 @@ export const PWA_OPTIONS: Partial<VitePWAOptions> = {
     theme_color: '#0f766e',
     background_color: '#ffffff',
     icons: [
-      // shortcut: one scalable SVG instead of a PNG set, upgrade when a rasteriser is in the
-      // toolchain or a store listing needs fixed sizes.
       { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-      { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+      { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: 'icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   },
   workbox: {
     // App shell only — the build's own output, nothing from the network.
-    globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+    globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
     // Source maps are shipped for debugging but must not be precached: they are large and the
     // app never needs them offline.
     globIgnores: ['**/*.map', '**/_headers'],

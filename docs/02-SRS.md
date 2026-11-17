@@ -106,6 +106,15 @@ Trong một báo cáo, hiển thị raw `elapsed` từ start đến end; quãng 
 - Nếu khung giờ/ngày/phương tiện khác, hiển thị cảnh báo so sánh khác điều kiện.
 - Cần tối thiểu 5 chuyến mỗi biến thể và tối thiểu 3 ngày khác nhau trước khi đưa nhận định xu hướng ổn định (ngưỡng sản phẩm mang tính heuristic, không phải kiểm định thống kê).
 
+### Định nghĩa triển khai M4/M5, 17/11/2026
+
+- Phương án đường do người dùng đặt trong Chi tiết chuyến đã hoàn thành, tối đa 120 ký tự sau khi bỏ khoảng trắng ở hai đầu. Để trống sẽ xóa nhãn. Nhóm A→B vẫn được gợi ý từ hai đầu GPS và phương tiện.
+- Khung giờ mặc định dài 120 phút, tính từ 00 giờ theo múi giờ thiết bị. Ngưỡng cấu hình trong `DEFAULT_COMPARE_OPTIONS`. Cảnh báo khi các chuyến được chọn khác ngày địa phương hoặc khung giờ.
+- Bản đồ và bảng so sánh chọn tối đa bốn chuyến. Thống kê sử dụng toàn bộ chuyến đã hoàn thành của nhóm A→B, tách theo nhãn phương án, phương tiện và khung giờ. Nhãn trống chỉ hiển thị số mẫu. Với ít nhất ba mẫu có nhãn, hiển thị median/P90 theo nearest rank và độ lệch chuẩn tổng thể. Các thống kê này mô tả mẫu đã có. Dấu hiệu đủ mẫu để đánh giá yêu cầu ít nhất năm chuyến, ba ngày, cùng khung giờ, mọi chuyến GPS GOOD và đầy đủ. Điều kiện này chưa tự chứng minh tuyến ổn định.
+- Xuất GPX/CSV có bán kính ẩn đầu/cuối do người dùng nhập, đơn vị mét, mặc định 0. Xóa mọi mẫu thuộc các vùng đầu/cuối, kể cả khi quay lại vùng đó, và tách đoạn tại các mẫu đã ẩn. GPS thô trong thiết bị giữ nguyên. Không còn điểm sẽ báo lỗi. JSON luôn là bản sao lưu đầy đủ, chỉ cho xuất khi bán kính là 0. Tên chuyến và thời gian vẫn có trong tệp xuất, đây chưa phải ẩn danh hoàn toàn.
+- Lịch sử có nút yêu cầu lưu trữ bền vững khi API được hỗ trợ. Chỉ gửi yêu cầu sau thao tác người dùng, hiển thị kết quả thật và hướng dẫn sao lưu. Người dùng vẫn có thể xóa dữ liệu trình duyệt.
+- Bản cập nhật PWA chờ các tab đang dùng đóng trước khi kích hoạt, tránh tải lại giữa chuyến. Service Worker chỉ cache app shell. Nghiệm thu thiết bị thật được ghi riêng theo RT-505.
+
 ## 9. API ngoài phạm vi
 
 MVP không có REST API. Giai đoạn sau chuẩn hóa interface `TripRepository`, `TrafficProvider` để bổ sung cloud mà không sửa sâu UI và thuật toán.

@@ -88,7 +88,7 @@ Kiểm thử **mô phỏng** (Vitest + Playwright với GPS giả lập). Chưa 
 | GPS-009 | ✅ | `analyzeTrip.test.ts` |
 | GPS-010 | ✅ | `analyzeTrip.test.ts` (± 1 ms) |
 | GPS-011 | ✅ | `analyzeTrip.test.ts` (~60 %, LOW) |
-| GPS-012 | ⏳ M4 | nhóm A→B |
+| GPS-012 | ✅ | `src/domain/compare/compare.test.ts`, chiều ngược tách nhóm |
 | AC-01, AC-02, AC-04, AC-10 | ✅ | `e2e/tracking.spec.ts` |
 | AC-03, AC-05, AC-07, AC-09 | ✅ | `e2e/persistence.spec.ts` |
 | NFR-02, NFR-06 (header/CSP, không gửi dữ liệu ra ngoài) | ✅ | `deploy/securityHeaders.test.ts`, `e2e/security.spec.ts`, kiểm tra vi phạm CSP cuối `e2e/tracking.spec.ts` |
@@ -96,6 +96,11 @@ Kiểm thử **mô phỏng** (Vitest + Playwright với GPS giả lập). Chưa 
 | RT-301 (FR-09) | ✅ | `historyFilter.test.ts` (không dấu, ngày địa phương, trạng thái, URL), `HistoryPage.test.tsx`, `e2e/history.spec.ts` |
 | RT-302, RT-304 (FR-10) | ✅ | `TripDetailPage.test.tsx` (phân tích lại từ dữ liệu gốc, cảnh báo LOW “X phút”, “Cách tính”), `useTrips.test.tsx` (không đọc lại toàn bộ điểm mỗi mẫu) |
 | RT-303 | ✅ | `speedSeries.test.ts` (UNKNOWN = ngắt đường, không phải 0; gộp ≤ 600 điểm), `SpeedChart.test.tsx`, `e2e/history.spec.ts` (canvas, không vi phạm CSP) |
-| AC-06, AC-11 | ⏳ M4 | |
+| AC-06 | ✅ | `ComparePage.test.tsx`, `e2e/compare.spec.ts`, bảng đủ số liệu, cảnh báo điều kiện, tối đa bốn overlay, thống kê toàn nhóm |
+| AC-11, FR-19, FR-22 | ✅ | `serialize.test.ts`, `routeVariant.test.ts`, `RouteVariantEditor.test.tsx`, `TripDetailPage.test.tsx`, `e2e/dataTransfer.spec.ts` |
+| FR-23 | ✅ | `persistence.test.ts`, `PersistentStorageNotice.test.tsx`, cấp/từ chối/không hỗ trợ/lỗi và chặn yêu cầu khi đang ghi |
+| NFR-05, RT-501 | ✅ | `e2e/offline.spec.ts`, Service Worker thật, nhập chuyến và tải lại Lịch sử/Chi tiết offline, cache không chứa map tiles |
+
+Cập nhật M4/M5 ngày 17/11/2026. Báo cáo kiểm tra nằm trong `docs/11-M4-M5-QA.md`. Kiểm thử tự động dùng dữ liệu tổng hợp. RT-505 cần điện thoại thật, chưa được tự động đánh dấu hoàn tất.
 
 Hiệu năng (§5): `analyzeTrip` trên 10 000 điểm đo được ~100 ms (lần đầu) / ~40 ms (đã warm) trên máy phát triển; trên điện thoại thật cần đo lại.

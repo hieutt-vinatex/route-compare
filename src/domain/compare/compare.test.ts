@@ -10,7 +10,12 @@ import { destinationPoint } from '../geo/haversine';
 import { DEFAULT_GPS_CONFIG as cfg } from '../models/gpsConfig';
 import type { TransportMode, Trip } from '../models/types';
 import { createTrip } from '../trip/tripFactory';
-import { compareTrips, MIN_TRIPS_FOR_DISTRIBUTION, type ComparedTrip } from './compare';
+import {
+  compareTrips,
+  summarizeVariants,
+  MIN_TRIPS_FOR_DISTRIBUTION,
+  type ComparedTrip,
+} from './compare';
 import { groupTrips, routedTripOf, sameRoute } from './grouping';
 
 const A = { lat: 20.3, lng: 105.75 };
@@ -27,6 +32,7 @@ function trip(options: {
   return {
     ...createTrip({ id, name: id, transportMode: mode, startedAt }),
     status: 'COMPLETED',
+    routeVariantLabel: 'Đường A',
     endedAt: startedAt + 60_000,
     startLat: start?.lat ?? null,
     startLng: start?.lng ?? null,
@@ -53,7 +59,7 @@ describe('route grouping (RT-401)', () => {
     expect(groupTrips([trip({ id: 'a' }), trip({ id: 'b', start: far })], cfg)).toHaveLength(2);
   });
 
-  it('never groups the reverse direction with the forward one', () => {
+  it('GPS-012 never groups the reverse direction with the forward one', () => {
     const forward = trip({ id: 'a', start: A, end: B });
     const reverse = trip({ id: 'b', start: B, end: A });
     expect(groupTrips([forward, reverse], cfg)).toHaveLength(2);
@@ -186,5 +192,113 @@ describe('distribution (RT-403)', () => {
     const c = compareTrips([], cfg.quality.goodCoveragePct);
     expect(c.rows).toHaveLength(0);
     expect(c.fastestTripId).toBeNull();
+  });
+});
+
+describe('comparison conditions and variant distributions', () => {
+  const at = (day: number, hour = 8) => new Date(2026, 10, day, hour).getTime();
+  const sample = (id: string, day: number, hour = 8, label: string | null = 'A'): ComparedTrip => ({
+    ...compared(id),
+    trip: { ...trip({ id, startedAt: at(day, hour) }), routeVariantLabel: label },
+  });
+
+  it('keeps all metrics and null speeds and calculates elapsed percentage against fastest', () => {
+    const result = compareTrips(
+      [compared('a'), compared('b', { elapsedMs: 900_000, minSpeedKmh: null })],
+      90,
+    );
+    expect(result.rows[1]).toMatchObject({
+      stoppedMs: 0,
+      pausedMs: 0,
+      unknownMs: 100_000,
+      avgMovingKmh: 36,
+      maxSpeedKmh: 45,
+      minSpeedKmh: null,
+      elapsedDeltaPct: 50,
+    });
+    expect(
+      compareTrips([compared('zero', { elapsedMs: 0 })], 90).rows[0]?.elapsedDeltaPct,
+    ).toBeNull();
+  });
+
+  it('warns on different local dates and departure windows with configurable width', () => {
+    const samples = [sample('a', 1, 8), sample('b', 2, 10)];
+    expect(compareTrips(samples, 90)).toMatchObject({
+      differentDates: true,
+      differentDepartureWindows: true,
+    });
+    expect(
+      compareTrips(samples, 90, { departureWindowMinutes: 240 }).differentDepartureWindows,
+    ).toBe(false);
+  });
+
+  it('uses all repeated trips beyond overlay limit and qualifies samples without claiming stability', () => {
+    const samples = [
+      sample('a', 1),
+      sample('b', 1),
+      sample('c', 2),
+      sample('d', 2),
+      sample('e', 3),
+    ];
+    const [stats] = summarizeVariants(samples, 90);
+    expect(stats).toMatchObject({
+      sampleCount: 5,
+      dateCount: 3,
+      medianElapsedMs: 600_000,
+      p90ElapsedMs: 600_000,
+      stddevElapsedMs: 0,
+      sufficientForEvaluation: true,
+    });
+    expect(
+      summarizeVariants(
+        samples.map((s) => ({ ...s, metrics: metrics({ isIncomplete: true }) })),
+        90,
+      )[0]?.sufficientForEvaluation,
+    ).toBe(false);
+  });
+
+  it('partitions route variants, modes and departure windows instead of pooling distributions', () => {
+    const items = [
+      sample('a', 1),
+      sample('b', 2),
+      sample('c', 3, 8, 'B'),
+      sample('d', 4, 10),
+      { ...sample('e', 5), trip: { ...sample('e', 5).trip, transportMode: 'CAR' as const } },
+    ];
+    expect(
+      summarizeVariants(items, 90)
+        .map((s) => s.sampleCount)
+        .sort(),
+    ).toEqual([1, 1, 1, 2]);
+    expect(compareTrips(items, 90).medianElapsedMs).toBeNull();
+    expect(
+      summarizeVariants(
+        [sample('x', 1, 8, null), sample('y', 2, 8, null), sample('z', 3, 8, null)],
+        90,
+      )[0]?.medianElapsedMs,
+    ).toBeNull();
+  });
+
+  it('reports population standard deviation and refuses qualification on one or two dates', () => {
+    const items = [sample('a', 1), sample('b', 1), sample('c', 2)].map((s, i) => ({
+      ...s,
+      metrics: metrics({ elapsedMs: (i + 1) * 1000 }),
+    }));
+    expect(summarizeVariants(items, 90)[0]?.stddevElapsedMs).toBeCloseTo(Math.sqrt(2 / 3) * 1000);
+    expect(
+      summarizeVariants([...items, sample('d', 1), sample('e', 2)], 90)[0]?.sufficientForEvaluation,
+    ).toBe(false);
+  });
+
+  it('preserves stored incompleteness even when replay GPS is clean', () => {
+    const items = [
+      sample('a', 1),
+      sample('b', 2),
+      sample('c', 3),
+      sample('d', 4),
+      sample('e', 5),
+    ].map((item) => ({ ...item, trip: { ...item.trip, isIncomplete: true } }));
+    expect(summarizeVariants(items, 90)[0]?.sufficientForEvaluation).toBe(false);
+    expect(compareTrips(items, 90).rows.every((row) => row.isIncomplete)).toBe(true);
   });
 });

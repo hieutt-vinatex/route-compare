@@ -90,6 +90,10 @@ export interface TripRepository {
    * the trip is missing or not COMPLETED, RangeError when the name is empty or too long.
    */
   renameTrip(id: string, name: string, updatedAt: number): Promise<void>;
+  /** Finished trips only. Trims the label; null/blank clears it. Rejects over 120 characters.
+   * Atomically changes only routeVariantLabel and updatedAt, preserving other metadata.
+   */
+  setRouteVariant(id: string, label: string | null, updatedAt: number): Promise<void>;
   getTrip(id: string): Promise<Trip | undefined>;
   listTrips(): Promise<Trip[]>;
   /** Trips not yet COMPLETED (recording elsewhere, or left over after a reload/crash). */

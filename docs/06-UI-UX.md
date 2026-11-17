@@ -44,7 +44,7 @@ Bottom navigation (mobile): **Trang chủ | Lịch sử | So sánh**; trang **Đ
 - Overlay polyline mỗi trip màu khác nhau và legend có tên; **segment gap không nối**.
 - Table: `Elapsed`, `Distance measured`, `Moving`, `Stopped`, `Unknown`, `Avg speed`, `Max speed`, `Coverage`, `Departure time`.
 - Tính chênh lệch `B-A` về thời gian (phút và %) và chiều dài; nếu có LOW quality thì đánh dấu *không đủ cơ sở kết luận quãng đường*.
-- Với ≥5 trips/route variant (P1): median và P90 elapsed, phân phối theo giờ/ngày, sample count.
+- Thống kê toàn nhóm tách theo phương án đường, phương tiện và khung giờ địa phương 120 phút. Median/P90 mô tả từ ba mẫu có nhãn, kèm độ lệch chuẩn và số ngày. Đủ mẫu để đánh giá cần ít nhất năm chuyến trong ba ngày, GPS tốt và đầy đủ. Điều kiện này chưa xác nhận tuyến ổn định.
 
 ## 7. Empty/Error/Offline UI
 

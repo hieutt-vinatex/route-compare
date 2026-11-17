@@ -85,8 +85,18 @@ Luồng một mẫu GPS: `watchPosition` → chuẩn hóa đơn vị → **hàng
 | **M1** | ✅ | Browser Geolocation adapter (idempotent, mock), Home có trạng thái quyền/vị trí, Tracking (Start/Hủy/Kết thúc có xác nhận, bản đồ nhiều segment, trạng thái tín hiệu, offline), Page Visibility + Wake Lock tùy chọn, hidden→gap không nối, Trip Detail tối thiểu |
 | **M2** | ✅ | Dexie/IndexedDB (schema v1, giao dịch, test migration), mô hình độ lệch đồng hồ, lọc OUTLIER + drift, phân loại MOVING/STOPPED/UNKNOWN, phân hoạch thời gian, coverage + nhãn chất lượng, Tạm dừng/Tiếp tục, checkpoint + timeout khi lưu, khôi phục sau reload, khóa một tab. GPS-001…011 |
 | **M3** | ✅ | Lịch sử: tìm theo tên (không phân biệt dấu), lọc phương tiện/ngày/trạng thái, bộ lọc nằm trên URL. Chi tiết: tính lại từ dữ liệu GPS gốc (bản đồ, số liệu, lý do “chưa đầy đủ” cùng một nguồn), cảnh báo chất lượng thấp, “Cách tính các số liệu”, biểu đồ tốc độ Chart.js (tải lười) tô vùng không xác định/tạm dừng, đổi tên, xóa có xác nhận (AC-08) |
-| **M4** | ✅ | Nhóm tuyến A→B (150 m, cùng phương tiện, chiều ngược là nhóm khác), So sánh 2–4 chuyến (bản đồ chồng tuyến nhiều màu, bảng chênh lệch, cảnh báo độ phủ thấp/khác phương tiện), Trung vị + P90 **chỉ khi đủ 3 chuyến**, Xuất GPX/CSV/JSON mỗi chuyến, Nhập GPX, Sao lưu/Khôi phục toàn bộ JSON (không ghi đè) |
-| **M5** | 🔄 | PWA: manifest + service worker **chỉ cache app shell** (không tải sẵn ô bản đồ, không đụng GPS), trang Giới thiệu/Quyền riêng tư/Giới hạn, QA 360/390/1280 px bằng Playwright, deploy Cloudflare Pages. Còn lại: **RT-505 field test trên thiết bị thật** |
+| **M4** | ✅ | Nhóm A→B 150 m/cùng phương tiện, gắn phương án đường, chồng 2–4 chuyến, bảng đủ thời gian/tốc độ/chênh lệch/độ phủ, cảnh báo khác ngày/khung giờ, thống kê toàn nhóm theo phương án và khung giờ, xuất GPX/CSV có ẩn đầu/cuối, JSON sao lưu/khôi phục, nhập GPX |
+| **M5** | 🔄 | PWA cache app shell, test offline với Service Worker thật và dữ liệu đã lưu, PNG/maskable/Apple icon, cập nhật chờ đóng tab, yêu cầu lưu trữ bền vững, QA mobile và deploy Cloudflare Pages. **RT-505 vẫn chờ nghiệm thu điện thoại thật** |
+
+### Sử dụng các phần M4/M5
+
+- Trong Chi tiết chuyến, nhập **Phương án đường** rồi lưu, chẳng hạn “Qua đường A”. Để trống để bỏ nhãn. Nhãn không làm thay đổi dữ liệu GPS.
+- Trong So sánh, chọn nhóm A→B rồi chọn tối đa bốn chuyến. Bảng có thể cuộn ngang bằng cảm ứng hoặc bàn phím. Thống kê bên dưới sử dụng toàn bộ chuyến trong nhóm, tách theo phương án, phương tiện và khung giờ địa phương 120 phút. Median/P90 và độ lệch chuẩn tổng thể cần ba mẫu có nhãn. Điều kiện đủ mẫu để đánh giá cần năm chuyến trong ba ngày và GPS tốt/đầy đủ, chưa tự xác nhận tuyến ổn định.
+- Khi xuất GPX/CSV, nhập **Ẩn đầu/cuối khi xuất (m)**. Mọi mẫu trong vùng đầu/cuối sẽ bị bỏ, kể cả khi quay lại vùng đó, các đoạn còn lại được tách để tránh nối qua vùng đã ẩn. CSV riêng tư thêm `exportRunId` để nhận biết các đoạn xuất, giữ nguyên các cột RAW. Bán kính 0 giữ định dạng xuất cũ. JSON chứa đầy đủ dữ liệu và chỉ xuất khi bán kính bằng 0. Tên chuyến và thời gian vẫn có thể nhận diện bạn.
+- Trong Lịch sử, có thể **Yêu cầu giữ dữ liệu trên thiết bị** nếu trình duyệt hỗ trợ. Kết quả phụ thuộc trình duyệt. Tải JSON định kỳ và giữ ở nơi riêng tư vì việc xóa dữ liệu site vẫn xóa hành trình.
+- Sau lần tải online và Service Worker cài xong, mở lại app để dùng app shell/Lịch sử/Chi tiết offline. Nền bản đồ cần mạng. Bản cập nhật PWA kích hoạt sau khi đóng các tab cũ.
+
+Kết quả nghiệm thu tự động và giới hạn thực địa được ghi trong [báo cáo M4/M5](docs/11-M4-M5-QA.md).
 
 ### Giới hạn đã biết (sau M3)
 
@@ -101,16 +111,16 @@ Luồng một mẫu GPS: `watchPosition` → chuẩn hóa đơn vị → **hàng
 - Trên trình duyệt không có Web Locks (iOS < 15.4) khóa một-tab dùng lease 15 s; tab bị ẩn lâu có thể mất quyền ghi cho tab khác và sẽ tự dừng ghi khi phát hiện.
 - Nhóm tuyến dùng ghép tham lam quanh chuyến mới nhất của nhóm; chuyến thiếu điểm đầu hoặc điểm cuối GPS **không** ghép nhóm được nên không xuất hiện ở trang So sánh.
 - Trung vị/P90 lấy theo thứ hạng gần nhất trên đúng các chuyến bạn chọn, không nội suy và không gộp các nhóm khác.
-- Biểu tượng PWA dùng một tệp SVG (`sizes="any"`); chưa có bộ PNG 192/512 vì toolchain chưa có bộ rasterise.
+- Cài PWA và hành vi pin/GPS trên Android/iOS cần nghiệm thu thiết bị thật riêng.
 - Chuyến **nhập từ GPX** dùng ngưỡng mất tín hiệu riêng, lấy theo nhịp ghi của chính tệp (3 × khoảng cách thời gian trung vị, tối thiểu 20 s) — vì logger ghi mỗi 30 s không phải là “mất GPS 30 s”. Nếu tệp không ghi độ chính xác, bộ lọc nhiễu chỉ còn ngưỡng 2 m nên **lúc đứng yên có thể bị cộng dư quãng đường**; HDOP (nếu có) được quy đổi ước lượng × 5 m.
 - Danh sách Lịch sử không phân trang (phù hợp vài trăm chuyến). Biểu đồ gộp theo thời gian còn ~600 điểm, cộng tối đa 2 điểm cho mỗi khoảng ngắt (chuyến có hàng trăm khoảng mất GPS có thể vẽ nhiều điểm hơn).
 - Thời gian dùng đồng hồ hệ thống: nếu đổi giờ thiết bị **trong lúc** đang ghi, tổng thời gian chuyến đó có thể sai. Không dùng đồng hồ đơn điệu (`performance.now()`) vì trên iOS/macOS nó ngừng chạy khi máy ngủ — thời gian khóa màn hình sẽ biến mất khỏi chuyến.
 - Số liệu ở Lịch sử là bản tóm tắt lưu lúc Kết thúc; trang Chi tiết tính lại từ dữ liệu gốc — trùng nhau khi thuật toán/ngưỡng chưa đổi.
-- IndexedDB có thể bị trình duyệt xóa (xóa dữ liệu site, chế độ riêng tư); sao lưu JSON đến ở M4.
+- IndexedDB có thể bị trình duyệt xóa (xóa dữ liệu site, chế độ riêng tư); có yêu cầu lưu trữ bền vững và sao lưu JSON thủ công.
 
 ## Kiểm thử
 
-- **Unit/replay** (`src/**/*.test.ts`): GPS-001…011 (bảng truy vết ở `docs/07-TEST-PLAN.md` §7), **CLOCK_ERROR** (đồng hồ lệch cố định, fix “ở tương lai”, giao trễ, đồng hồ bị chỉnh, độ trễ trôi dần), bất biến “không cộng quãng đường qua ranh giới đoạn” với replay ngẫu nhiên có seed, “phát lại = live”. GPS-012 (nhóm A→B) thuộc M4.
+- **Unit/replay** (`src/**/*.test.ts`): GPS-001…012 (bảng truy vết ở `docs/07-TEST-PLAN.md` §7), **CLOCK_ERROR** (đồng hồ lệch cố định, fix “ở tương lai”, giao trễ, đồng hồ bị chỉnh, độ trễ trôi dần), bất biến “không cộng quãng đường qua ranh giới đoạn” với replay ngẫu nhiên có seed, “phát lại = live”, nhóm A→B/chiều ngược, metadata nguyên tử và xuất ẩn vùng đầu/cuối.
 - **Repository** (fake-indexeddb): CRUD, unique `[tripId+sourceSeq]`, xóa cascade nguyên tử, mở lại DB, mẫu nâng cấp schema giữ dữ liệu.
 - **Controller**: ghi RAW trước, ghi storage lệch thứ tự (đã kiểm bằng mutation test), lỗi quota, thu hồi quyền, tạm dừng/tiếp tục, checkpoint, timeout khi lưu, khôi phục sau reload, khóa một tab, Wake Lock.
 - **E2E (Playwright)**: chạy code adapter thật với **GPS giả lập** và đồng hồ trang được điều khiển — quyền, ẩn/hiện → 2 đoạn không nối, giữ dữ liệu qua reload (AC-05), khôi phục + đoạn mới, tạm dừng (AC-03), hai tab (AC-07), bộ nhớ đầy (AC-09), chỉ request tới origin app và tile OSM, header bảo mật trên mọi route và **không có vi phạm CSP** trong cả luồng ghi chuyến; `fetch` tới origin khác bị chặn.
